@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
     @AppStorage("externalTheme") private var theme = "purple"
     @AppStorage("customAccentHex") private var customAccentHex = "A34FFA"
@@ -38,12 +37,9 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 22) {
-                    hero
                     appearanceSection
-                    behaviorSection
                     deviceSection
                     aboutSection
-                    footer
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -52,13 +48,6 @@ struct SettingsView: View {
             .background(AppTheme.pageBackground.ignoresSafeArea())
             .navigationTitle("Configurações")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Fechar") { dismiss() }
-                        .fontWeight(.bold)
-                        .foregroundStyle(themeAccent)
-                }
-            }
             .tint(themeAccent)
             .liquidGlassRoot()
         }
