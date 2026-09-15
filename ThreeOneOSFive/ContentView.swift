@@ -234,6 +234,7 @@ private extension AppSection {
         case .files: return "tab.files"
         case .search: return "tab.search"
         case .external: return "tab.external"
+        case .settings: return "settings.title"
         }
     }
 
