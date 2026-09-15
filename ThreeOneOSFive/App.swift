@@ -242,9 +242,12 @@ final class LicenseManager: ObservableObject {
     private var storedKey: String?
     private var deviceID: String
     private var refreshInFlight = false
+    private var lastValidationAt: Date?
 
     init() {
         storedKey = Self.loadKey(service: keychainService, account: keychainAccount)
+        isAuthorized = storedKey != nil
+        isLoading = false
         if let existingDeviceID = Self.loadKey(
             service: deviceKeychainService,
             account: deviceKeychainAccount
@@ -264,21 +267,25 @@ final class LicenseManager: ObservableObject {
 
     func refresh() {
         guard !refreshInFlight else { return }
+        if let lastValidationAt, Date().timeIntervalSince(lastValidationAt) < 60 {
+            return
+        }
         refreshInFlight = true
-        isLoading = true
-        let key = storedKey
+        let wasAuthorized = isAuthorized
+        if !wasAuthorized { isLoading = true }
+        guard let key = storedKey, !key.isEmpty else {
+            isAuthorized = false
+            isLoading = false
+            refreshInFlight = false
+            return
+        }
         Task {
-            guard let key, !key.isEmpty else {
-                isAuthorized = false
-                message = nil
-                isLoading = false
-                return
-            }
             do {
                 let result = try await validate(key: key)
                 if result.isValid {
                     isAuthorized = true
                     message = nil
+                    lastValidationAt = Date()
                 } else {
                     revoke()
                     message = result.message
@@ -286,8 +293,9 @@ final class LicenseManager: ObservableObject {
             } catch {
                 // A transient network failure does not erase a previously valid key.
                 // Invalid or expired responses always revoke it above.
-                isAuthorized = storedKey != nil
+                isAuthorized = wasAuthorized || storedKey != nil
                 message = isAuthorized ? nil : "Unable to connect to the activation service."
+                lastValidationAt = Date()
             }
             isLoading = false
             refreshInFlight = false
@@ -313,6 +321,7 @@ final class LicenseManager: ObservableObject {
             try Self.saveKey(key, service: keychainService, account: keychainAccount)
             storedKey = key
             isAuthorized = true
+            lastValidationAt = Date()
             message = nil
         } catch {
             isAuthorized = false
