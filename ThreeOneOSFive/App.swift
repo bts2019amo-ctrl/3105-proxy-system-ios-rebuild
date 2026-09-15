@@ -246,10 +246,12 @@ final class LicenseManager: ObservableObject {
     private let deviceKeychainService = "com.bts2019amo.3105.device"
     private let legacyDeviceKeychainService = "com.apple.mobile.MobileHouseArrest.device"
     private let deviceKeychainAccount = "device-id"
+    private let lastSuccessfulValidationKey = "license.last-successful-validation"
     private var storedKey: String?
     private var deviceID: String
     private var refreshInFlight = false
     private var lastValidationAt: Date?
+    private var lastSuccessfulValidationAt: Date?
 
     init() {
         storedKey = Self.loadKey(service: keychainService, account: keychainAccount)
@@ -260,6 +262,7 @@ final class LicenseManager: ObservableObject {
         // A key saved locally is only a candidate; the app must validate it before entering.
         isAuthorized = false
         isLoading = storedKey != nil
+        lastSuccessfulValidationAt = UserDefaults.standard.object(forKey: lastSuccessfulValidationKey) as? Date
         if let existingDeviceID = Self.loadKey(service: deviceKeychainService, account: deviceKeychainAccount), !existingDeviceID.isEmpty {
             deviceID = existingDeviceID
         } else if let legacyDeviceID = Self.loadKey(service: legacyDeviceKeychainService, account: deviceKeychainAccount), !legacyDeviceID.isEmpty {
@@ -297,14 +300,21 @@ final class LicenseManager: ObservableObject {
                     isAuthorized = true
                     message = nil
                     lastValidationAt = Date()
+                    lastSuccessfulValidationAt = Date()
+                    UserDefaults.standard.set(lastSuccessfulValidationAt, forKey: lastSuccessfulValidationKey)
                 } else {
                     revoke()
                     message = result.message
                 }
             } catch {
-                // Without a successful validation, never unlock the app.
-                isAuthorized = false
-                message = "Unable to verify the license right now."
+                // A temporary API/rate-limit failure must not turn a known-valid key into
+                // an invalid one. Keep the recent validated session, but never use this
+                // fallback after an explicit invalid/expired response (handled above).
+                let hasRecentValidation = lastSuccessfulValidationAt.map {
+                    Date().timeIntervalSince($0) < 24 * 60 * 60
+                } ?? false
+                isAuthorized = hasRecentValidation
+                message = hasRecentValidation ? nil : "Unable to verify the license right now."
                 lastValidationAt = Date()
             }
             isLoading = false
@@ -332,6 +342,8 @@ final class LicenseManager: ObservableObject {
             storedKey = key
             isAuthorized = true
             lastValidationAt = Date()
+            lastSuccessfulValidationAt = Date()
+            UserDefaults.standard.set(lastSuccessfulValidationAt, forKey: lastSuccessfulValidationKey)
             message = nil
         } catch {
             isAuthorized = false
@@ -344,6 +356,8 @@ final class LicenseManager: ObservableObject {
         Self.deleteKey(service: keychainService, account: keychainAccount)
         storedKey = nil
         isAuthorized = false
+        lastSuccessfulValidationAt = nil
+        UserDefaults.standard.removeObject(forKey: lastSuccessfulValidationKey)
     }
 
     private struct ValidationResult {
@@ -414,6 +428,17 @@ final class LicenseManager: ObservableObject {
         let expiredByDate = expirationDate.map { $0 <= Date() } ?? false
         let expiredByDuration = expiresIn.map { $0 <= 0 } ?? false
         let activeStatus = status.map { ["active", "valid", "enabled", "ok", "success"].contains($0) } ?? false
+        let definitiveInvalidStatus = status.map {
+            ["invalid", "expired", "revoked", "disabled", "inactive"].contains($0)
+        } ?? false
+        let invalidMessage = responseMessage.map { message in
+            let text = message.lowercased()
+            return text.contains("invalid") || text.contains("expired") || text.contains("revoked")
+                || text.contains("not found") || text.contains("não encontrada")
+        } ?? false
+        if valid == false && !definitiveInvalidStatus && !invalidMessage {
+            throw LicenseValidationError.invalidResponse
+        }
         let isValid = (valid ?? activeStatus) && !expiredByDate && !expiredByDuration
         return ValidationResult(isValid: isValid, message: responseMessage)
     }
