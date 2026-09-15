@@ -127,7 +127,7 @@ struct PatchProjectsView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Configurações de aparência")
-                    .sheet(isPresented: $showThemeMenu) {
+                    .fullScreenCover(isPresented: $showThemeMenu) {
                         PatchAppearanceSheet(
                             selectedTheme: $externalTheme,
                             onClose: { showThemeMenu = false }
@@ -517,7 +517,8 @@ private struct PatchAppearanceSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        ZStack(alignment: .top) {
+            AppTheme.pageBackground.ignoresSafeArea()
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 22) {
                     header
@@ -525,25 +526,44 @@ private struct PatchAppearanceSheet: View {
                     customColorRow
                     pulsePreview
                 }
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.top, 76)
+                .padding(.bottom, 36)
             }
-            .background(AppTheme.pageBackground.ignoresSafeArea())
-            .navigationTitle("Aparência")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Fechar") {
-                        onClose()
-                        dismiss()
-                    }
-                    .fontWeight(.bold)
-                    .foregroundStyle(AppTheme.accent)
-                }
-            }
-            .liquidGlassRoot()
+            .scrollIndicators(.hidden)
+
+            topBar
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .background(.ultraThinMaterial)
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .ignoresSafeArea(edges: .bottom)
+        .liquidGlassRoot()
+    }
+
+    private var topBar: some View {
+        HStack {
+            Text("Aparência")
+                .font(.headline.weight(.bold))
+            Spacer()
+            Button {
+                onClose()
+                dismiss()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "xmark")
+                    Text("Fechar")
+                }
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(AppTheme.accent)
+                .padding(.horizontal, 13)
+                .padding(.vertical, 9)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay { Capsule().stroke(AppTheme.accent.opacity(0.35), lineWidth: 0.8) }
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(height: 52)
     }
 
     private var header: some View {
