@@ -15,14 +15,21 @@ A inspeção foi executada em um ambiente Linux sem `xcodebuild`, Swift ou SDKs 
 
 ## Compilação automatizada
 
-O workflow do GitHub Actions usa um runner `macos-14`, seleciona o Xcode estável mais recente e executa uma compilação `Release` para `generic/platform=iOS` com `CODE_SIGNING_ALLOWED=NO` e `CODE_SIGNING_REQUIRED=NO`. Se a compilação for concluída, o workflow publica como artefatos o bundle `.app` e um pacote `.ipa` sem assinatura.
+O workflow do GitHub Actions usa um runner `macos-15`, seleciona o Xcode estável mais recente e executa uma compilação `Release` para `generic/platform=iOS` com `CODE_SIGNING_ALLOWED=NO` e `CODE_SIGNING_REQUIRED=NO`. Quando a compilação é concluída, o workflow publica como artefatos o bundle `.app` e um pacote `.ipa` sem assinatura.
 
 O `.ipa` produzido sem assinatura é um artefato de validação e não é instalável em um dispositivo. Para obter uma IPA instalável, é necessário compilar em um Mac com certificado e provisioning profile válidos, sem expor esses arquivos no repositório.
 
 ## Resultado observado
 
-Foram feitas tentativas nos runners `macos-15` e `macos-14`. Ambas terminaram em aproximadamente dez segundos, antes do primeiro step, com `runner_id: 0`, `runner_name` vazio e nenhum step executado. Isso indica que o GitHub não alocou um runner macOS para este repositório/conta; portanto, o código não chegou a ser compilado pelo Actions. A execução mais recente é [34925829888](https://github.com/bts2019amo-ctrl/3105-proxy-system-ios-rebuild/actions/runs/34925829888).
+A compilação foi concluída com sucesso no runner `macos-15` em aproximadamente 1 minuto e 53 segundos. Todos os steps passaram: seleção do Xcode, detecção do projeto, listagem do scheme, build sem assinatura, empacotamento da IPA e upload dos artefatos. A execução está disponível em [34925989420](https://github.com/bts2019amo-ctrl/3105-proxy-system-ios-rebuild/actions/runs/34925989420).
+
+Artefatos gerados:
+
+- `3105-unsigned.ipa`
+- `3105.app`
+
+Os artefatos não possuem assinatura de distribuição. A IPA precisa ser assinada com certificado e provisioning profile válidos antes da instalação em um dispositivo físico.
 
 ## Resultado esperado
 
-O resultado final da compilação automatizada ficará na aba **Actions** do novo repositório. Uma execução verde confirma que o código compila com o SDK iOS disponível no runner; ela não substitui a assinatura nem a validação em um dispositivo físico.
+Uma execução verde confirma que o código compila com o SDK iOS disponível no runner; ela não substitui a assinatura nem a validação em um dispositivo físico.
