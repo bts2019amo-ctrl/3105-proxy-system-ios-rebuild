@@ -55,7 +55,7 @@ final class PackageRepositoryStore: ObservableObject {
 
     var packages: [RepositoryPackageRecord] {
         guard isAuthorized else { return [] }
-        sources.flatMap { source -> [RepositoryPackageRecord] in
+        return sources.flatMap { source -> [RepositoryPackageRecord] in
             guard let repository = repositories[source.id] else {
                 return []
             }
@@ -83,7 +83,7 @@ final class PackageRepositoryStore: ObservableObject {
 
     func repository(for sourceID: UUID) -> PackageRepository? {
         guard isAuthorized else { return nil }
-        repositories[sourceID]
+        return repositories[sourceID]
     }
 
     func setAuthorized(_ authorized: Bool) {
