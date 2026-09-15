@@ -498,13 +498,13 @@ private struct PatchAppearanceSheet: View {
     let onClose: () -> Void
     @AppStorage("customAccentHex") private var customAccentHex = "A34FFA"
     @State private var customColor: Color
-    private let menuAccent = Color(red: 0.55, green: 0.74, blue: 0.95)
+    private let menuAccent = Color.white
 
     private var menuBorder: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
             .stroke(
                 LinearGradient(
-                    colors: [Color.white.opacity(0.62), menuAccent.opacity(0.28), Color.white.opacity(0.12)],
+                    colors: [Color.white.opacity(0.62), Color.white.opacity(0.28), Color.white.opacity(0.12)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
@@ -531,7 +531,8 @@ private struct PatchAppearanceSheet: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            AppTheme.pageBackground.ignoresSafeArea()
+            Color(uiColor: UIColor(red: 0.055, green: 0.055, blue: 0.065, alpha: 1))
+                .ignoresSafeArea()
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 22) {
                     header
@@ -551,7 +552,7 @@ private struct PatchAppearanceSheet: View {
                 .background(.ultraThinMaterial)
         }
         .ignoresSafeArea(edges: .bottom)
-        .tint(menuAccent)
+        .tint(.white)
     }
 
     private var topBar: some View {
