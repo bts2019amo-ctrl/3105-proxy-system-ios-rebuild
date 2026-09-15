@@ -80,7 +80,6 @@ enum AppTheme {
 struct LiquidGlassRootModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .fontDesign(.rounded)
             .tint(AppTheme.accent)
             .background(AppTheme.pageGradient.ignoresSafeArea())
     }
