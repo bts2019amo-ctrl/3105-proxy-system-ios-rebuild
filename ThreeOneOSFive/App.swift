@@ -105,6 +105,8 @@ struct ThreeOneOSFiveApp: App {
             }
             .onChange(of: licenseManager.isAuthorized) { authorized in
                 remoteControl.setAuthorized(authorized)
+                patchStore.setAuthorized(authorized)
+                repositoryStore.setAuthorized(authorized)
                 if authorized {
                     patchStore.startInitialLoad()
                 }

@@ -37,13 +37,21 @@ final class PatchProjectStore: ObservableObject {
 
     private var pendingUnlock: PendingUnlock?
     private var didStartInitialLoad = false
+    private var isAuthorized = false
 
     init() {
         isBusy = false
     }
 
+    func setAuthorized(_ authorized: Bool) {
+        isAuthorized = authorized
+        guard !authorized else { return }
+        items = []
+        didStartInitialLoad = false
+    }
+
     func startInitialLoad() {
-        guard !didStartInitialLoad else { return }
+        guard isAuthorized, !didStartInitialLoad else { return }
         didStartInitialLoad = true
         isBusy = true
         Task.detached(priority: .userInitiated) { [weak self] in
@@ -53,6 +61,7 @@ final class PatchProjectStore: ObservableObject {
     }
 
     func reload() {
+        guard isAuthorized else { return }
         items = PatchProjectLibrary.load()
     }
 

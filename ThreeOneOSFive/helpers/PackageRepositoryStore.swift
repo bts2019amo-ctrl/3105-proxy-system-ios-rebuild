@@ -22,6 +22,7 @@ final class PackageRepositoryStore: ObservableObject {
     private let defaults: UserDefaults
     private var resolutionIndex: RepositoryPackageResolutionIndex
     private var refreshedThisLaunch = false
+    private var isAuthorized = false
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -53,6 +54,7 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     var packages: [RepositoryPackageRecord] {
+        guard isAuthorized else { return [] }
         sources.flatMap { source -> [RepositoryPackageRecord] in
             guard let repository = repositories[source.id] else {
                 return []
@@ -80,7 +82,16 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     func repository(for sourceID: UUID) -> PackageRepository? {
+        guard isAuthorized else { return nil }
         repositories[sourceID]
+    }
+
+    func setAuthorized(_ authorized: Bool) {
+        isAuthorized = authorized
+        guard !authorized else { return }
+        repositories.removeAll()
+        sourceStates = sourceStates.mapValues { _ in .idle }
+        refreshedThisLaunch = false
     }
 
     func state(for sourceID: UUID) -> RepositorySourceState {
@@ -131,6 +142,7 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     func refreshAllIfNeeded() {
+        guard isAuthorized else { return }
         guard !refreshedThisLaunch else { return }
         refreshedThisLaunch = true
         Task { [weak self] in
@@ -141,6 +153,7 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     func refreshAll() {
+        guard isAuthorized else { return }
         Task { [weak self] in
             guard let self else { return }
             await self.synchronizeDefaultSources()
@@ -149,6 +162,7 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     func refreshAllAndWait() async {
+        guard isAuthorized else { return }
         await synchronizeDefaultSources()
         refreshStoredSources()
         while isRefreshing {
