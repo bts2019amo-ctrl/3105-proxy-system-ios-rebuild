@@ -498,6 +498,19 @@ private struct PatchAppearanceSheet: View {
     let onClose: () -> Void
     @AppStorage("customAccentHex") private var customAccentHex = "A34FFA"
     @State private var customColor: Color
+    private let menuAccent = Color(red: 0.55, green: 0.74, blue: 0.95)
+
+    private var menuBorder: some View {
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .stroke(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.62), menuAccent.opacity(0.28), Color.white.opacity(0.12)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.8
+            )
+    }
 
     private let palette: [(String, String, Color)] = [
         ("purple", "Roxo", Color(hex: "A34FFA")),
@@ -538,7 +551,7 @@ private struct PatchAppearanceSheet: View {
                 .background(.ultraThinMaterial)
         }
         .ignoresSafeArea(edges: .bottom)
-        .liquidGlassRoot()
+        .tint(menuAccent)
     }
 
     private var topBar: some View {
@@ -555,11 +568,11 @@ private struct PatchAppearanceSheet: View {
                     Text("Fechar")
                 }
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(AppTheme.accent)
+                .foregroundStyle(menuAccent)
                 .padding(.horizontal, 13)
                 .padding(.vertical, 9)
                 .background(.ultraThinMaterial, in: Capsule())
-                .overlay { Capsule().stroke(AppTheme.accent.opacity(0.35), lineWidth: 0.8) }
+                .overlay { Capsule().stroke(menuAccent.opacity(0.35), lineWidth: 0.8) }
             }
             .buttonStyle(.plain)
         }
@@ -571,14 +584,14 @@ private struct PatchAppearanceSheet: View {
             HStack {
                 Image(systemName: "slider.horizontal.3")
                     .font(.title2.weight(.bold))
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(menuAccent)
                 Text("Seu Liquid Glass")
                     .font(.title2.weight(.bold))
                 Spacer()
                 Circle()
-                    .fill(AppTheme.accent)
+                    .fill(menuAccent)
                     .frame(width: 18, height: 18)
-                    .shadow(color: AppTheme.accent.opacity(0.6), radius: 8)
+                    .shadow(color: menuAccent.opacity(0.6), radius: 8)
             }
             Text("Escolha a cor que aparece em todo o app. A mudança fica salva no dispositivo.")
                 .font(.subheadline)
@@ -586,12 +599,12 @@ private struct PatchAppearanceSheet: View {
         }
         .padding(18)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay { AppCardBorder() }
+        .overlay { menuBorder }
     }
 
     private var paletteGrid: some View {
         VStack(alignment: .leading, spacing: 11) {
-            Text("PALETA").font(.caption2.weight(.bold)).tracking(1.2).foregroundStyle(AppTheme.accent)
+            Text("PALETA").font(.caption2.weight(.bold)).tracking(1.2).foregroundStyle(menuAccent)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 14) {
                 ForEach(palette, id: \.0) { item in
                     Button {
@@ -612,7 +625,7 @@ private struct PatchAppearanceSheet: View {
                                 }
                                 .shadow(color: item.2.opacity(selectedTheme == item.0 ? 0.62 : 0.2), radius: selectedTheme == item.0 ? 10 : 3)
                                 .scaleEffect(selectedTheme == item.0 ? 1.08 : 1)
-                            Text(item.1).font(.caption2.weight(.semibold)).foregroundStyle(selectedTheme == item.0 ? AppTheme.accent : .secondary)
+                            Text(item.1).font(.caption2.weight(.semibold)).foregroundStyle(selectedTheme == item.0 ? menuAccent : .secondary)
                         }
                     }
                     .buttonStyle(.plain)
@@ -621,19 +634,19 @@ private struct PatchAppearanceSheet: View {
             }
             .padding(16)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay { AppCardBorder() }
+            .overlay { menuBorder }
         }
     }
 
     private var customColorRow: some View {
         VStack(alignment: .leading, spacing: 11) {
-            Text("COR PERSONALIZADA").font(.caption2.weight(.bold)).tracking(1.2).foregroundStyle(AppTheme.accent)
+            Text("COR PERSONALIZADA").font(.caption2.weight(.bold)).tracking(1.2).foregroundStyle(menuAccent)
             HStack(spacing: 12) {
                 Image(systemName: "eyedropper.full")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(menuAccent)
                     .frame(width: 38, height: 38)
-                    .background(AppTheme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .background(menuAccent.opacity(0.16), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Escolha qualquer cor").font(.subheadline.weight(.semibold))
                     Text("Toque no seletor ao lado").font(.caption).foregroundStyle(.secondary)
@@ -649,7 +662,7 @@ private struct PatchAppearanceSheet: View {
             }
             .padding(14)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay { AppCardBorder() }
+            .overlay { menuBorder }
         }
     }
 
@@ -657,17 +670,17 @@ private struct PatchAppearanceSheet: View {
         HStack(spacing: 12) {
             Image(systemName: "waveform.path.ecg")
                 .font(.title3.weight(.bold))
-                .foregroundStyle(AppTheme.accent)
+                .foregroundStyle(menuAccent)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Animações ativas").font(.subheadline.weight(.semibold))
                 Text("O app usa pulsação suave, brilho e feedback de toque").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Circle().fill(AppTheme.accent).frame(width: 12, height: 12).shadow(color: AppTheme.accent, radius: 8)
+            Circle().fill(menuAccent).frame(width: 12, height: 12).shadow(color: menuAccent, radius: 8)
         }
         .padding(16)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay { AppCardBorder() }
+        .overlay { menuBorder }
     }
 }
 
