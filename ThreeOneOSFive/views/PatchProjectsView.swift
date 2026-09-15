@@ -95,13 +95,35 @@ struct PatchProjectsView: View {
                             showThemeMenu.toggle()
                         }
                     } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 38, height: 38)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.42), lineWidth: 0.8))
-                            .shadow(color: AppTheme.accent.opacity(0.18), radius: 10, y: 4)
-                            .rotationEffect(.degrees(showThemeMenu ? 28 : 0))
+                        ZStack {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [AppTheme.accent.opacity(0.42), Color.white.opacity(0.08)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.82), AppTheme.accent.opacity(0.36), Color.white.opacity(0.16)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                            Image(systemName: showThemeMenu ? "xmark" : "slider.horizontal.3")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.white)
+                                .rotationEffect(.degrees(showThemeMenu ? 90 : 0))
+                        }
+                        .frame(width: 40, height: 40)
+                        .shadow(color: AppTheme.accent.opacity(0.3), radius: 12, y: 5)
+                        .scaleEffect(showThemeMenu ? 1.04 : 1)
+                        .animation(.spring(response: 0.36, dampingFraction: 0.72), value: showThemeMenu)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Configurações de aparência")
@@ -112,7 +134,6 @@ struct PatchProjectsView: View {
                         )
                     }
                 }
-                ToolbarItem(placement: .navigationBarLeading) { Text("EXTERNAL iOS").font(.headline.weight(.bold)) }
             }
             .sheet(isPresented: $showCreate) {
                 PatchProjectEditorView(
@@ -242,6 +263,7 @@ struct PatchProjectsView: View {
             .background(selectedCollection == title ? AppTheme.accent.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
         .buttonStyle(.plain)
+        .buttonStyle(LiquidGlassButtonStyle(tint: AppTheme.accent))
         .animation(.spring(response: 0.34, dampingFraction: 0.8), value: selectedCollection)
     }
 

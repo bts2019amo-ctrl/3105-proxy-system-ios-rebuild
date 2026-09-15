@@ -78,6 +78,7 @@ struct ThreeOneOSFiveApp: App {
                     }
                 }
             }
+            .liquidGlassRoot()
             .displayIdentityAttribution(isPresented: $showAttribution, enabled: !showLaunchSequence)
             .sheet(isPresented: $showAttribution) {
                 DisplayAttributionSheet()

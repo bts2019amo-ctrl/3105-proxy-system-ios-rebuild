@@ -63,13 +63,25 @@ enum AppTheme {
 }
 
 struct LiquidGlassRootModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var backdropPhase = false
+
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 16.1, *) {
             content
                 .fontDesign(.rounded)
                 .tint(AppTheme.accent)
-                .background(AppTheme.pageGradient.ignoresSafeArea())
+                .background {
+                    AnimatedGlassBackdrop(phase: backdropPhase)
+                        .ignoresSafeArea()
+                }
+                .onAppear {
+                    guard !reduceMotion else { return }
+                    withAnimation(.easeInOut(duration: 7.0).repeatForever(autoreverses: true)) {
+                        backdropPhase = true
+                    }
+                }
         } else {
             content
                 .tint(AppTheme.accent)
@@ -110,6 +122,61 @@ struct LiquidGlassToggleStyle: ToggleStyle {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
+    }
+}
+
+struct LiquidGlassButtonStyle: ButtonStyle {
+    var tint: Color = AppTheme.accent
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.primary)
+            .background {
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.68), tint.opacity(0.34), Color.white.opacity(0.12)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.8
+                            )
+                    }
+            }
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .brightness(configuration.isPressed ? 0.06 : 0)
+            .animation(.spring(response: 0.26, dampingFraction: 0.72), value: configuration.isPressed)
+    }
+}
+
+private struct AnimatedGlassBackdrop: View {
+    let phase: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                AppTheme.pageGradient
+                Circle()
+                    .fill(AppTheme.accent.opacity(0.12))
+                    .frame(width: 260, height: 260)
+                    .blur(radius: 22)
+                    .offset(
+                        x: phase ? proxy.size.width * 0.28 : -proxy.size.width * 0.22,
+                        y: phase ? -proxy.size.height * 0.18 : proxy.size.height * 0.16
+                    )
+                Circle()
+                    .fill(Color.white.opacity(0.05))
+                    .frame(width: 210, height: 210)
+                    .blur(radius: 24)
+                    .offset(
+                        x: phase ? -proxy.size.width * 0.24 : proxy.size.width * 0.2,
+                        y: phase ? proxy.size.height * 0.3 : -proxy.size.height * 0.22
+                    )
+            }
+        }
     }
 }
 
@@ -165,24 +232,44 @@ struct AppRowIcon: View {
     var tint: Color = AppTheme.accent
     var symbolSize: CGFloat = AppTheme.rowIconSize
     var frameSize: CGFloat = AppTheme.rowIconFrame
+    @State private var appeared = false
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.white.opacity(0.08))
+                .fill(.ultraThinMaterial)
                 .overlay {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(tint.opacity(0.12))
+                        .fill(
+                            LinearGradient(
+                                colors: [tint.opacity(0.2), Color.white.opacity(0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .overlay {
                             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .stroke(tint.opacity(0.22), lineWidth: 0.6)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.65), tint.opacity(0.32)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.7
+                                )
                         }
                 }
             Image(systemName: systemName)
                 .font(.system(size: symbolSize, weight: .medium))
                 .foregroundStyle(tint)
+                .scaleEffect(appeared ? 1 : 0.72)
+                .opacity(appeared ? 1 : 0)
         }
         .frame(width: frameSize, height: frameSize)
+        .shadow(color: tint.opacity(appeared ? 0.2 : 0), radius: 8, y: 3)
+        .rotationEffect(.degrees(appeared ? 0 : -7))
+        .animation(.spring(response: 0.46, dampingFraction: 0.72), value: appeared)
+        .onAppear { appeared = true }
         .accessibilityHidden(true)
     }
 }

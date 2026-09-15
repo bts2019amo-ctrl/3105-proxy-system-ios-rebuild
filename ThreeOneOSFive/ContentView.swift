@@ -59,6 +59,8 @@ struct ContentView: View {
         .background(Color.clear)
         .tint(AppTheme.accent)
         .imageScale(.small)
+        .liquidGlassRoot()
+        .buttonStyle(LiquidGlassButtonStyle())
         .onChange(of: patchDraftCoordinator.request?.id) { requestID in
             if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
         }
