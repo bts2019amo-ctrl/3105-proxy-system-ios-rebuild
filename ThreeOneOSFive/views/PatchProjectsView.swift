@@ -127,8 +127,8 @@ struct PatchProjectsView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Configurações de aparência")
-                    .popover(isPresented: $showThemeMenu, arrowEdge: .top) {
-                        ThemeSelectionPopover(
+                    .sheet(isPresented: $showThemeMenu) {
+                        PatchAppearanceSheet(
                             selectedTheme: $externalTheme,
                             onClose: { showThemeMenu = false }
                         )
@@ -492,147 +492,162 @@ struct PatchProjectsView: View {
     }
 }
 
-private struct ThemeSelectionPopover: View {
+private struct PatchAppearanceSheet: View {
+    @Environment(\.dismiss) private var dismiss
     @Binding var selectedTheme: String
     let onClose: () -> Void
+    @AppStorage("customAccentHex") private var customAccentHex = "A34FFA"
+    @State private var customColor: Color
+
+    private let palette: [(String, String, Color)] = [
+        ("purple", "Roxo", Color(hex: "A34FFA")),
+        ("blue", "Azul", .blue),
+        ("cyan", "Ciano", .cyan),
+        ("green", "Verde", .green),
+        ("orange", "Laranja", .orange),
+        ("red", "Vermelho", .red),
+        ("pink", "Rosa", .pink),
+        ("white", "Branco", .white)
+    ]
+
+    init(selectedTheme: Binding<String>, onClose: @escaping () -> Void) {
+        _selectedTheme = selectedTheme
+        self.onClose = onClose
+        _customColor = State(initialValue: Color(hex: UserDefaults.standard.string(forKey: "customAccentHex") ?? "A34FFA"))
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Aparência")
-                        .font(.headline.weight(.bold))
-                    Text("Escolha o acabamento do Liquid Glass")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 22) {
+                    header
+                    paletteGrid
+                    customColorRow
+                    pulsePreview
                 }
-                Spacer()
-                Image(systemName: "wand.and.stars")
-                    .font(.title3.weight(.semibold))
+                .padding(20)
+            }
+            .background(AppTheme.pageBackground.ignoresSafeArea())
+            .navigationTitle("Aparência")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Fechar") {
+                        onClose()
+                        dismiss()
+                    }
+                    .fontWeight(.bold)
                     .foregroundStyle(AppTheme.accent)
+                }
             }
+            .liquidGlassRoot()
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
 
-            themeOption(
-                title: "Roxo",
-                subtitle: "Glass vibrante",
-                value: "purple",
-                tint: AppTheme.accent,
-                icon: "sparkles"
-            )
-            themeOption(
-                title: "Branco",
-                subtitle: "Glass claro",
-                value: "white",
-                tint: .white,
-                icon: "sun.max.fill"
-            )
-            HStack(spacing: 10) {
-                colorDot("blue", .blue, "Azul")
-                colorDot("cyan", .cyan, "Ciano")
-                colorDot("green", .green, "Verde")
-                colorDot("orange", .orange, "Laranja")
-                colorDot("red", .red, "Vermelho")
-                colorDot("pink", .pink, "Rosa")
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(AppTheme.accent)
+                Text("Seu Liquid Glass")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Circle()
+                    .fill(AppTheme.accent)
+                    .frame(width: 18, height: 18)
+                    .shadow(color: AppTheme.accent.opacity(0.6), radius: 8)
             }
+            Text("Escolha a cor que aparece em todo o app. A mudança fica salva no dispositivo.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
         .padding(18)
-        .frame(width: 286)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.72), AppTheme.accent.opacity(0.24), Color.white.opacity(0.16)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.9
-                )
-        }
-        .shadow(color: AppTheme.accent.opacity(0.2), radius: 22, y: 10)
+        .overlay { AppCardBorder() }
     }
 
-    private func themeOption(
-        title: String,
-        subtitle: String,
-        value: String,
-        tint: Color,
-        icon: String
-    ) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.36, dampingFraction: 0.78)) {
-                selectedTheme = value
-            }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(tint.opacity(value == "white" ? 0.2 : 0.28))
-                    Image(systemName: icon)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(tint)
+    private var paletteGrid: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text("PALETA").font(.caption2.weight(.bold)).tracking(1.2).foregroundStyle(AppTheme.accent)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 14) {
+                ForEach(palette, id: \.0) { item in
+                    Button {
+                        withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) { selectedTheme = item.0 }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        VStack(spacing: 7) {
+                            Circle()
+                                .fill(item.2)
+                                .frame(width: 42, height: 42)
+                                .overlay {
+                                    Circle().stroke(Color.white.opacity(0.86), lineWidth: selectedTheme == item.0 ? 2.8 : 0.8)
+                                }
+                                .overlay {
+                                    if selectedTheme == item.0 {
+                                        Image(systemName: "checkmark").font(.caption.weight(.black)).foregroundStyle(item.0 == "white" ? .black : .white)
+                                    }
+                                }
+                                .shadow(color: item.2.opacity(selectedTheme == item.0 ? 0.62 : 0.2), radius: selectedTheme == item.0 ? 10 : 3)
+                                .scaleEffect(selectedTheme == item.0 ? 1.08 : 1)
+                            Text(item.1).font(.caption2.weight(.semibold)).foregroundStyle(selectedTheme == item.0 ? AppTheme.accent : .secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .animation(.spring(response: 0.34, dampingFraction: 0.76), value: selectedTheme)
                 }
-                .frame(width: 34, height: 34)
+            }
+            .padding(16)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay { AppCardBorder() }
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+    private var customColorRow: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text("COR PERSONALIZADA").font(.caption2.weight(.bold)).tracking(1.2).foregroundStyle(AppTheme.accent)
+            HStack(spacing: 12) {
+                Image(systemName: "eyedropper.full")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppTheme.accent)
+                    .frame(width: 38, height: 38)
+                    .background(AppTheme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Escolha qualquer cor").font(.subheadline.weight(.semibold))
+                    Text("Toque no seletor ao lado").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: selectedTheme == value ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(selectedTheme == value ? AppTheme.accent : .secondary)
-                    .scaleEffect(selectedTheme == value ? 1 : 0.88)
+                ColorPicker("", selection: $customColor, supportsOpacity: false)
+                    .labelsHidden()
+                    .scaleEffect(1.25)
+                    .onChange(of: customColor) { color in
+                        customAccentHex = color.hexString
+                        selectedTheme = "custom"
+                    }
             }
-            .padding(.horizontal, 12)
-            .frame(minHeight: 54)
-            .background(
-                selectedTheme == value ? AppTheme.accent.opacity(0.14) : Color.clear,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(
-                        selectedTheme == value
-                            ? AppTheme.accent.opacity(0.36)
-                            : Color.white.opacity(0.16),
-                        lineWidth: 0.8
-                    )
-            }
+            .padding(14)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay { AppCardBorder() }
         }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.36, dampingFraction: 0.78), value: selectedTheme)
     }
 
-    private func colorDot(_ value: String, _ color: Color, _ label: String) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.36, dampingFraction: 0.78)) {
-                selectedTheme = value
+    private var pulsePreview: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "waveform.path.ecg")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(AppTheme.accent)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Animações ativas").font(.subheadline.weight(.semibold))
+                Text("O app usa pulsação suave, brilho e feedback de toque").font(.caption).foregroundStyle(.secondary)
             }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        } label: {
-            Circle()
-                .fill(color)
-                .frame(width: 27, height: 27)
-                .overlay {
-                    Circle().stroke(Color.white.opacity(0.7), lineWidth: selectedTheme == value ? 2.2 : 0.8)
-                }
-                .overlay {
-                    if selectedTheme == value {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .shadow(color: color.opacity(0.45), radius: selectedTheme == value ? 6 : 0)
-                .accessibilityLabel(label)
+            Spacer()
+            Circle().fill(AppTheme.accent).frame(width: 12, height: 12).shadow(color: AppTheme.accent, radius: 8)
         }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.36, dampingFraction: 0.78), value: selectedTheme)
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay { AppCardBorder() }
     }
 }
 
