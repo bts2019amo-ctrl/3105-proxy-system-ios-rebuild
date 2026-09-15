@@ -99,17 +99,11 @@ struct PatchProjectsView: View {
                             Circle()
                                 .fill(.ultraThinMaterial)
                             Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [AppTheme.accent.opacity(0.42), Color.white.opacity(0.08)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                .fill(Color.white.opacity(0.12))
                             Circle()
                                 .stroke(
                                     LinearGradient(
-                                        colors: [Color.white.opacity(0.82), AppTheme.accent.opacity(0.36), Color.white.opacity(0.16)],
+                                        colors: [Color.white.opacity(0.82), Color.white.opacity(0.34), Color.white.opacity(0.16)],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     ),
@@ -121,11 +115,12 @@ struct PatchProjectsView: View {
                                 .rotationEffect(.degrees(showThemeMenu ? 90 : 0))
                         }
                         .frame(width: 40, height: 40)
-                        .shadow(color: AppTheme.accent.opacity(0.3), radius: 12, y: 5)
+                        .shadow(color: Color.black.opacity(0.28), radius: 12, y: 5)
                         .scaleEffect(showThemeMenu ? 1.04 : 1)
                         .animation(.spring(response: 0.36, dampingFraction: 0.72), value: showThemeMenu)
                     }
                     .buttonStyle(.plain)
+                    .tint(.white)
                     .accessibilityLabel("Configurações de aparência")
                     .fullScreenCover(isPresented: $showThemeMenu) {
                         PatchAppearanceSheet(
