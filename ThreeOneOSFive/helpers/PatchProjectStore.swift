@@ -36,8 +36,15 @@ final class PatchProjectStore: ObservableObject {
     }
 
     private var pendingUnlock: PendingUnlock?
+    private var didStartInitialLoad = false
 
     init() {
+        isBusy = false
+    }
+
+    func startInitialLoad() {
+        guard !didStartInitialLoad else { return }
+        didStartInitialLoad = true
         isBusy = true
         Task.detached(priority: .userInitiated) { [weak self] in
             let loadedItems = PatchProjectLibrary.load()

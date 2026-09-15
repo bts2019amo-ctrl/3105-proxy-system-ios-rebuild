@@ -105,6 +105,9 @@ struct ThreeOneOSFiveApp: App {
             }
             .onChange(of: licenseManager.isAuthorized) { authorized in
                 remoteControl.setAuthorized(authorized)
+                if authorized {
+                    patchStore.startInitialLoad()
+                }
             }
             .onChange(of: scenePhase) { phase in
                 guard phase == .active else { return }
@@ -246,8 +249,9 @@ final class LicenseManager: ObservableObject {
 
     init() {
         storedKey = Self.loadKey(service: keychainService, account: keychainAccount)
-        isAuthorized = storedKey != nil
-        isLoading = false
+        // A key saved locally is only a candidate; the app must validate it before entering.
+        isAuthorized = false
+        isLoading = storedKey != nil
         if let existingDeviceID = Self.loadKey(
             service: deviceKeychainService,
             account: deviceKeychainAccount
@@ -271,8 +275,7 @@ final class LicenseManager: ObservableObject {
             return
         }
         refreshInFlight = true
-        let wasAuthorized = isAuthorized
-        if !wasAuthorized { isLoading = true }
+        isLoading = true
         guard let key = storedKey, !key.isEmpty else {
             isAuthorized = false
             isLoading = false
@@ -291,10 +294,9 @@ final class LicenseManager: ObservableObject {
                     message = result.message
                 }
             } catch {
-                // A transient network failure does not erase a previously valid key.
-                // Invalid or expired responses always revoke it above.
-                isAuthorized = wasAuthorized || storedKey != nil
-                message = isAuthorized ? nil : "Unable to connect to the activation service."
+                // Without a successful validation, never unlock the app.
+                isAuthorized = false
+                message = "Unable to verify the license right now."
                 lastValidationAt = Date()
             }
             isLoading = false
