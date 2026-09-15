@@ -4,8 +4,6 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("externalTheme") private var theme = "purple"
     @AppStorage("customAccentHex") private var customAccentHex = "A34FFA"
-    @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
-    @AppStorage(FeatureVisibility.developerModeStorageKey) private var developerModeEnabled = false
     @State private var customColor: Color
 
     private let palette: [(String, String, Color)] = [
@@ -28,11 +26,6 @@ struct SettingsView: View {
         theme == "custom" ? customColor : AppTheme.accent
     }
 
-    private var themeDisplayName: String {
-        if theme == "custom" { return "Personalizada" }
-        return palette.first(where: { $0.0 == theme })?.1 ?? "Roxo"
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
@@ -51,43 +44,6 @@ struct SettingsView: View {
             .tint(themeAccent)
             .liquidGlassRoot()
         }
-    }
-
-    private var hero: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(themeAccent.opacity(0.2))
-                    AppLogo(size: 60)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Personalização")
-                        .font(.title2.weight(.bold))
-                    Text("Seu espaço, suas cores, seu ritmo")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                Circle().fill(themeAccent).frame(width: 10, height: 10)
-                Text("Tema atual: \(themeDisplayName)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(themeAccent)
-                Spacer()
-                Image(systemName: "wand.and.stars")
-                    .foregroundStyle(themeAccent)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial, in: Capsule())
-        }
-        .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay { AppCardBorder() }
     }
 
     private var appearanceSection: some View {
@@ -165,16 +121,6 @@ struct SettingsView: View {
         .animation(.spring(response: 0.34, dampingFraction: 0.76), value: theme)
     }
 
-    private var behaviorSection: some View {
-        settingsSection(title: "COMPORTAMENTO", icon: "sparkles") {
-            VStack(spacing: 0) {
-                ToggleRow(icon: "sparkles", title: "Cleaner", subtitle: "Mostrar limpeza de arquivos temporários", isOn: $cleanerEnabled, tint: themeAccent)
-                Divider().opacity(0.25)
-                ToggleRow(icon: "hammer.fill", title: "Modo desenvolvedor", subtitle: "Mostrar ferramentas avançadas", isOn: $developerModeEnabled, tint: themeAccent)
-            }
-        }
-    }
-
     private var deviceSection: some View {
         settingsSection(title: "DISPOSITIVO", icon: "iphone") {
             VStack(spacing: 0) {
@@ -225,18 +171,6 @@ struct SettingsView: View {
             Text(value).font(.caption).foregroundStyle(valueColor).lineLimit(1)
         }
         .padding(.vertical, 8)
-    }
-
-    private var footer: some View {
-        HStack {
-            Spacer()
-            Text("SECURE · SIMPLE · YOURS")
-                .font(.caption2.weight(.bold))
-                .tracking(1)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.top, 2)
     }
 
     private var appVersion: String {
