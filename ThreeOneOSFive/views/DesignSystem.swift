@@ -78,30 +78,11 @@ enum AppTheme {
 }
 
 struct LiquidGlassRootModifier: ViewModifier {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var backdropPhase = false
-
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 16.1, *) {
-            content
-                .fontDesign(.rounded)
-                .tint(AppTheme.accent)
-                .background {
-                    AnimatedGlassBackdrop(phase: backdropPhase)
-                        .ignoresSafeArea()
-                }
-                .onAppear {
-                    guard !reduceMotion else { return }
-                    withAnimation(.easeInOut(duration: 7.0).repeatForever(autoreverses: true)) {
-                        backdropPhase = true
-                    }
-                }
-        } else {
-            content
-                .tint(AppTheme.accent)
-                .background(AppTheme.pageGradient.ignoresSafeArea())
-        }
+        content
+            .fontDesign(.rounded)
+            .tint(AppTheme.accent)
+            .background(AppTheme.pageGradient.ignoresSafeArea())
     }
 }
 
@@ -162,36 +143,7 @@ struct LiquidGlassButtonStyle: ButtonStyle {
                     }
             }
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .brightness(configuration.isPressed ? 0.06 : 0)
-            .animation(.spring(response: 0.26, dampingFraction: 0.72), value: configuration.isPressed)
-    }
-}
-
-private struct AnimatedGlassBackdrop: View {
-    let phase: Bool
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                AppTheme.pageGradient
-                Circle()
-                    .fill(AppTheme.accent.opacity(0.12))
-                    .frame(width: 260, height: 260)
-                    .blur(radius: 22)
-                    .offset(
-                        x: phase ? proxy.size.width * 0.28 : -proxy.size.width * 0.22,
-                        y: phase ? -proxy.size.height * 0.18 : proxy.size.height * 0.16
-                    )
-                Circle()
-                    .fill(Color.white.opacity(0.05))
-                    .frame(width: 210, height: 210)
-                    .blur(radius: 24)
-                    .offset(
-                        x: phase ? -proxy.size.width * 0.24 : proxy.size.width * 0.2,
-                        y: phase ? proxy.size.height * 0.3 : -proxy.size.height * 0.22
-                    )
-            }
-        }
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -201,15 +153,7 @@ struct AppCardBorder: View {
             cornerRadius: AppTheme.contentCardCornerRadius,
             style: .continuous
         )
-        .strokeBorder(
-            LinearGradient(
-                colors: [Color.white.opacity(0.72), AppTheme.accent.opacity(0.24), Color.white.opacity(0.14)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            lineWidth: 0.8
-        )
-        .shadow(color: Color.black.opacity(0.08), radius: 18, y: 8)
+        .strokeBorder(Color.white.opacity(0.34), lineWidth: 0.8)
         .accessibilityHidden(true)
     }
 }
@@ -219,25 +163,9 @@ struct AppGlassRowBackground: View {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
             .fill(.ultraThinMaterial)
             .overlay {
-                LinearGradient(
-                    colors: [AppTheme.glassHighlight, .clear, AppTheme.accent.opacity(0.06)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-            .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.white.opacity(0.68), AppTheme.accent.opacity(0.18), Color.white.opacity(0.16)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.8
-                    )
+                    .stroke(Color.white.opacity(0.28), lineWidth: 0.8)
             }
-            .shadow(color: AppTheme.glassShadow, radius: 14, y: 7)
             .padding(.vertical, 4)
     }
 }
@@ -247,8 +175,6 @@ struct AppRowIcon: View {
     var tint: Color = AppTheme.accent
     var symbolSize: CGFloat = AppTheme.rowIconSize
     var frameSize: CGFloat = AppTheme.rowIconFrame
-    @State private var appeared = false
-
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -277,14 +203,8 @@ struct AppRowIcon: View {
             Image(systemName: systemName)
                 .font(.system(size: symbolSize, weight: .medium))
                 .foregroundStyle(tint)
-                .scaleEffect(appeared ? 1 : 0.72)
-                .opacity(appeared ? 1 : 0)
         }
         .frame(width: frameSize, height: frameSize)
-        .shadow(color: tint.opacity(appeared ? 0.2 : 0), radius: 8, y: 3)
-        .rotationEffect(.degrees(appeared ? 0 : -7))
-        .animation(.spring(response: 0.46, dampingFraction: 0.72), value: appeared)
-        .onAppear { appeared = true }
         .accessibilityHidden(true)
     }
 }

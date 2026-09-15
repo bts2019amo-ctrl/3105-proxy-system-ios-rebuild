@@ -3,13 +3,11 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("externalTheme") private var theme = "purple"
     @AppStorage("customAccentHex") private var customAccentHex = "A34FFA"
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
     @AppStorage(FeatureVisibility.developerModeStorageKey) private var developerModeEnabled = false
     @State private var customColor: Color
-    @State private var pulse = false
 
     private let palette: [(String, String, Color)] = [
         ("purple", "Roxo", Color(hex: "A34FFA")),
@@ -63,12 +61,6 @@ struct SettingsView: View {
             }
             .tint(themeAccent)
             .liquidGlassRoot()
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                    pulse = true
-                }
-            }
         }
     }
 
@@ -78,11 +70,8 @@ struct SettingsView: View {
                 ZStack {
                     Circle()
                         .fill(themeAccent.opacity(0.2))
-                        .blur(radius: 4)
                     AppLogo(size: 60)
                 }
-                .scaleEffect(pulse ? 1.04 : 1)
-                .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: pulse)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Personalização")
