@@ -240,9 +240,11 @@ final class LicenseManager: ObservableObject {
 
     // API oficial do Proxy System para validar chaves iOS com validade por dias.
     private let endpoint = "https://proxysystem.org/api/trpc/proxyKeys.publicCheckKey"
-    private let keychainService = "com.apple.mobile.MobileHouseArrest.activation"
+    private let keychainService = "com.bts2019amo.3105.activation"
+    private let legacyKeychainService = "com.apple.mobile.MobileHouseArrest.activation"
     private let keychainAccount = "license-key"
-    private let deviceKeychainService = "com.apple.mobile.MobileHouseArrest.device"
+    private let deviceKeychainService = "com.bts2019amo.3105.device"
+    private let legacyDeviceKeychainService = "com.apple.mobile.MobileHouseArrest.device"
     private let deviceKeychainAccount = "device-id"
     private var storedKey: String?
     private var deviceID: String
@@ -251,14 +253,18 @@ final class LicenseManager: ObservableObject {
 
     init() {
         storedKey = Self.loadKey(service: keychainService, account: keychainAccount)
+            ?? Self.loadKey(service: legacyKeychainService, account: keychainAccount)
+        if let storedKey {
+            try? Self.saveKey(storedKey, service: keychainService, account: keychainAccount)
+        }
         // A key saved locally is only a candidate; the app must validate it before entering.
         isAuthorized = false
         isLoading = storedKey != nil
-        if let existingDeviceID = Self.loadKey(
-            service: deviceKeychainService,
-            account: deviceKeychainAccount
-        ), !existingDeviceID.isEmpty {
+        if let existingDeviceID = Self.loadKey(service: deviceKeychainService, account: deviceKeychainAccount), !existingDeviceID.isEmpty {
             deviceID = existingDeviceID
+        } else if let legacyDeviceID = Self.loadKey(service: legacyDeviceKeychainService, account: deviceKeychainAccount), !legacyDeviceID.isEmpty {
+            deviceID = legacyDeviceID
+            try? Self.saveKey(legacyDeviceID, service: deviceKeychainService, account: deviceKeychainAccount)
         } else {
             let newDeviceID = UIDevice.current.identifierForVendor?.uuidString.lowercased()
                 ?? UUID().uuidString.lowercased()
@@ -407,7 +413,7 @@ final class LicenseManager: ObservableObject {
         )
         let expiredByDate = expirationDate.map { $0 <= Date() } ?? false
         let expiredByDuration = expiresIn.map { $0 <= 0 } ?? false
-        let activeStatus = status == "active" || status == "valid"
+        let activeStatus = status.map { ["active", "valid", "enabled", "ok", "success"].contains($0) } ?? false
         let isValid = (valid ?? activeStatus) && !expiredByDate && !expiredByDuration
         return ValidationResult(isValid: isValid, message: responseMessage)
     }
@@ -445,17 +451,24 @@ final class LicenseManager: ObservableObject {
 
     private static func findLicenseFields(in value: Any) -> [String: Any] {
         if let dictionary = value as? [String: Any] {
-            let keys = [
+            let strongKeys = [
                 "valid", "success", "ok", "isValid", "is_valid", "status",
                 "expiresAt", "expirationDate", "expires", "expiry", "validUntil",
                 "expiration", "expiresAtMs", "expirationTimestamp", "remainingSeconds",
                 "secondsLeft", "expiresIn", "daysRemaining", "daysLeft", "message", "reason"
             ]
-            if keys.contains(where: { dictionary[$0] != nil }) { return dictionary }
+            let hasNestedPayload = dictionary.keys.contains { ["result", "data", "json"].contains($0) }
+            let hasStrongLicenseField = strongKeys.contains { key in
+                dictionary[key] != nil && key != "success" && key != "ok"
+            }
+            if hasStrongLicenseField || (!hasNestedPayload && strongKeys.contains(where: { dictionary[$0] != nil })) {
+                return dictionary
+            }
             for child in dictionary.values {
                 let found = findLicenseFields(in: child)
                 if !found.isEmpty { return found }
             }
+            if strongKeys.contains(where: { dictionary[$0] != nil }) { return dictionary }
         } else if let array = value as? [Any] {
             for child in array {
                 let found = findLicenseFields(in: child)
