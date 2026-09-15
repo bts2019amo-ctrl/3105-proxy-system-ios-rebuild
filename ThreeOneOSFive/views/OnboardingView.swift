@@ -527,8 +527,11 @@ struct ActivationView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
                     Spacer(minLength: 34)
-                    AppLogo(size: 104)
-                        .shadow(color: AppTheme.accent.opacity(0.24), radius: 28, y: 12)
+                    Image("ExternalLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 220, height: 220)
+                        .accessibilityLabel("External System")
 
                     VStack(spacing: 8) {
                         Text("3105 SECURE ACCESS")
