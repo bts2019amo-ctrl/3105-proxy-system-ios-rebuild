@@ -1020,19 +1020,8 @@ struct AppUtilityToolbar: ToolbarContent {
     let onOpenLogs: () -> Void
 
     var body: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Menu {
-                Button(action: onOpenSettings) {
-                    Label(
-                        language.text("settings.title"),
-                        systemImage: "gearshape"
-                    )
-                }
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .symbolRenderingMode(.hierarchical)
-            }
-            .accessibilityLabel(language.text("accessibility.open_settings"))
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
+            EmptyView()
         }
     }
 }

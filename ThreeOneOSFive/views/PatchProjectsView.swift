@@ -25,9 +25,7 @@ struct PatchProjectsView: View {
     @State private var isImportingWallpapers = false
     @State private var showSimulatedWallpaperDetail = false
     @State private var simulatedWallpaperDetailGate = OneShotPresentationGate()
-    @State private var showThemeMenu = false
     @State private var selectedCollection = "FF NORMAL"
-    @AppStorage("externalTheme") private var externalTheme = "purple"
     let onOpenSettings: () -> Void
     let onOpenLogs: () -> Void
 
@@ -88,48 +86,6 @@ struct PatchProjectsView: View {
             .background(Color.clear)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
-                            showThemeMenu.toggle()
-                        }
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                            Circle()
-                                .fill(Color.clear)
-                            Circle()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [Color.white.opacity(0.56), Color.white.opacity(0.2), Color.white.opacity(0.08)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1
-                                )
-                            Image(systemName: showThemeMenu ? "xmark" : "slider.horizontal.3")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(.primary)
-                                .rotationEffect(.degrees(showThemeMenu ? 90 : 0))
-                        }
-                        .frame(width: 40, height: 40)
-                        .shadow(color: Color.black.opacity(0.16), radius: 8, y: 3)
-                        .scaleEffect(showThemeMenu ? 1.04 : 1)
-                        .animation(.spring(response: 0.36, dampingFraction: 0.72), value: showThemeMenu)
-                    }
-                    .buttonStyle(.plain)
-                    .tint(.white)
-                    .accessibilityLabel("Configurações de aparência")
-                    .fullScreenCover(isPresented: $showThemeMenu) {
-                        PatchAppearanceSheet(
-                            selectedTheme: $externalTheme,
-                            onClose: { showThemeMenu = false }
-                        )
-                    }
-                }
-            }
             .sheet(isPresented: $showCreate) {
                 PatchProjectEditorView(
                     existingProject: nil,

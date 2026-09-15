@@ -8,10 +8,10 @@ struct ContentView: View {
     @EnvironmentObject private var patchStore: PatchProjectStore
     @EnvironmentObject private var repositoryStore: PackageRepositoryStore
     @EnvironmentObject private var remoteControl: RemoteControlService
+    @EnvironmentObject private var appState: AppState
     @AppStorage(FeatureVisibility.developerModeStorageKey)
     private var developerModeEnabled = false
     @State private var tabNavigation: AppTabNavigationState
-    @State private var showSettings = false
 
     init() {
 #if targetEnvironment(simulator)
@@ -33,9 +33,6 @@ struct ContentView: View {
             initialTab = AppSection.installed.rawValue
         }
         _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: initialTab))
-        _showSettings = State(
-            initialValue: arguments.contains("--simulate-settings")
-        )
 #else
         _tabNavigation = State(
             initialValue: AppTabNavigationState(selectedTab: AppSection.installed.rawValue)
@@ -73,7 +70,6 @@ struct ContentView: View {
         .onAppear {
             tabNavigation.reconcileSelection(with: featureVisibility)
         }
-        .sheet(isPresented: $showSettings) { SettingsView() }
         .patchStorePresentation(patchStore)
         .repositoryStorePresentation(repositoryStore, patchStore: patchStore)
     }
@@ -152,6 +148,8 @@ struct ContentView: View {
             )
         case .external:
             ExternalPanelView()
+        case .settings:
+            SettingsView()
         case .files:
             AppDataBrowserView(
                 tabSession: filesTabSession,
@@ -202,7 +200,7 @@ struct ContentView: View {
     }
 
     private func openSettings() {
-        showSettings = true
+        tabNavigation.select(AppSection.settings.rawValue)
     }
 
 }
@@ -232,7 +230,7 @@ private extension AppSection {
         case .home: return "tab.home"
         case .new: return "tab.new"
         case .sources: return "tab.sources"
-        case .installed: return "tab.installed"
+        case .installed: return "tab.injector"
         case .files: return "tab.files"
         case .search: return "tab.search"
         case .external: return "tab.external"
@@ -248,6 +246,7 @@ private extension AppSection {
         case .files: return "folder.fill"
         case .search: return "magnifyingglass"
         case .external: return "scope"
+        case .settings: return "gearshape.fill"
         }
     }
 }
