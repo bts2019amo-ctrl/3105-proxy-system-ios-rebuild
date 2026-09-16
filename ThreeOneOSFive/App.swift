@@ -284,13 +284,23 @@ final class LicenseManager: ObservableObject {
                     updateExpiration(result.expirationDate)
                     lastValidationAt = Date()
                 } else {
-                    revoke()
-                    message = result.message
+                    if Self.isRevocationMessage(result.message) {
+                        revoke()
+                        message = result.message
+                    } else {
+                        isAuthorized = storedKey != nil
+                        message = nil
+                    }
                 }
             } catch let error as LicenseValidationError {
                 if case .definitiveInvalid(let invalidMessage) = error {
-                    revoke()
-                    message = invalidMessage ?? error.localizedDescription
+                    if Self.isRevocationMessage(invalidMessage) {
+                        revoke()
+                        message = invalidMessage ?? error.localizedDescription
+                    } else {
+                        isAuthorized = storedKey != nil
+                        message = nil
+                    }
                 } else {
                     let hasPreviouslyValidatedKey = storedKey != nil
                     isAuthorized = hasPreviouslyValidatedKey
@@ -348,6 +358,14 @@ final class LicenseManager: ObservableObject {
         isAuthorized = false
         expirationDate = nil
         UserDefaults.standard.removeObject(forKey: expirationDateKey)
+    }
+
+    private static func isRevocationMessage(_ message: String?) -> Bool {
+        guard let message else { return false }
+        let text = message.lowercased()
+        return text.contains("expired") || text.contains("expirada")
+            || text.contains("expirado") || text.contains("revoked")
+            || text.contains("revogada") || text.contains("revogado")
     }
 
     private func updateExpiration(_ value: Date?) {
