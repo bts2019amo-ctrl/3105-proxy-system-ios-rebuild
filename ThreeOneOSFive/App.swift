@@ -277,7 +277,7 @@ final class LicenseManager: ObservableObject {
         }
         Task {
             do {
-                let result = try await validate(key: key)
+                let result = try await validateWithRetry(key: key)
                 if result.isValid {
                     isAuthorized = true
                     message = nil
@@ -319,7 +319,7 @@ final class LicenseManager: ObservableObject {
         isLoading = true
         message = nil
         do {
-            let result = try await validate(key: key)
+            let result = try await validateWithRetry(key: key)
             guard result.isValid else {
                 isAuthorized = false
                 message = result.message ?? "Invalid or expired key."
@@ -328,8 +328,8 @@ final class LicenseManager: ObservableObject {
             }
             try Self.saveKey(key, service: keychainService, account: keychainAccount)
             storedKey = key
-            isAuthorized = true
             updateExpiration(result.expirationDate)
+            isAuthorized = true
             lastValidationAt = Date()
             message = nil
         } catch {
@@ -378,6 +378,24 @@ final class LicenseManager: ObservableObject {
                     ?? "Activation service returned HTTP \(status)."
             }
         }
+    }
+
+    private func validateWithRetry(key: String) async throws -> ValidationResult {
+        var lastError: Error?
+        for attempt in 0..<3 {
+            do {
+                return try await validate(key: key)
+            } catch let error as LicenseValidationError {
+                if case .definitiveInvalid = error { throw error }
+                lastError = error
+            } catch {
+                lastError = error
+            }
+            if attempt < 2 {
+                try? await Task.sleep(nanoseconds: UInt64(500_000_000 * (attempt + 1)))
+            }
+        }
+        throw lastError ?? LicenseValidationError.invalidResponse
     }
 
     private func validate(key: String) async throws -> ValidationResult {
