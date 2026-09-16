@@ -443,7 +443,8 @@ final class LicenseManager: ObservableObject {
         let expiredByDuration = (remainingSeconds ?? remainingDays).map { $0 <= 0 } ?? false
         let activeStatus = status.map { ["active", "valid", "enabled", "ok", "success"].contains($0) } ?? false
         let definitiveInvalidStatus = status.map {
-            ["invalid", "expired", "revoked", "disabled", "inactive", "not_found", "notfound", "blocked", "banned"].contains($0)
+            ["invalid", "expired", "revoked", "disabled", "inactive", "not_found", "notfound",
+             "blocked", "banned", "device_mismatch", "pending"].contains($0)
         } ?? false
         let invalidMessage = responseMessage.map { message in
             let text = message.lowercased()
@@ -458,14 +459,11 @@ final class LicenseManager: ObservableObject {
            active == false && valid == false && success == false {
             throw LicenseValidationError.invalidResponse
         }
-        let serverSaysValid: Bool
-        if definitiveInvalidStatus || invalidMessage {
-            serverSaysValid = false
-        } else if activeStatus || active == true {
-            serverSaysValid = true
-        } else {
-            serverSaysValid = active ?? valid ?? success ?? false
-        }
+        let serverSaysValid = !definitiveInvalidStatus && !invalidMessage
+            && success == true
+            && valid == true
+            && active == true
+            && (status == nil || activeStatus)
         let isValid = serverSaysValid && !expiredByDate && !expiredByDuration
         return ValidationResult(
             isValid: isValid,
