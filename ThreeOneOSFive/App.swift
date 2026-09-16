@@ -421,13 +421,24 @@ final class LicenseManager: ObservableObject {
         let expirationValue = fields["expiresAt"] ?? fields["expirationDate"]
             ?? fields["expires"] ?? fields["expiry"] ?? fields["validUntil"]
             ?? fields["expiration"] ?? fields["expiresAtMs"] ?? fields["expirationTimestamp"]
-        let expirationDate = Self.expirationDate(from: expirationValue)
-        let expiresIn = Self.numberValue(
+            ?? fields["expires_at"] ?? fields["expiration_date"] ?? fields["valid_until"]
+            ?? fields["expiration_timestamp"]
+        var expirationDate = Self.expirationDate(from: expirationValue)
+        let remainingSeconds = Self.numberValue(
             fields["remainingSeconds"] ?? fields["secondsLeft"] ?? fields["expiresIn"]
-                ?? fields["daysRemaining"] ?? fields["daysLeft"]
+                ?? fields["remaining_seconds"] ?? fields["seconds_left"] ?? fields["expires_in"]
         )
+        let remainingDays = Self.numberValue(
+            fields["daysRemaining"] ?? fields["daysLeft"]
+                ?? fields["days_remaining"] ?? fields["days_left"]
+        )
+        if expirationDate == nil, let remainingSeconds, remainingSeconds > 0 {
+            expirationDate = Date(timeIntervalSinceNow: remainingSeconds)
+        } else if expirationDate == nil, let remainingDays, remainingDays > 0 {
+            expirationDate = Date(timeIntervalSinceNow: remainingDays * 24 * 60 * 60)
+        }
         let expiredByDate = expirationDate.map { $0 <= Date() } ?? false
-        let expiredByDuration = expiresIn.map { $0 <= 0 } ?? false
+        let expiredByDuration = (remainingSeconds ?? remainingDays).map { $0 <= 0 } ?? false
         let activeStatus = status.map { ["active", "valid", "enabled", "ok", "success"].contains($0) } ?? false
         let definitiveInvalidStatus = status.map {
             ["invalid", "expired", "revoked", "disabled", "inactive", "not_found", "notfound", "blocked", "banned"].contains($0)
@@ -503,7 +514,9 @@ final class LicenseManager: ObservableObject {
                 "valid", "success", "ok", "isValid", "is_valid", "status",
                 "expiresAt", "expirationDate", "expires", "expiry", "validUntil",
                 "expiration", "expiresAtMs", "expirationTimestamp", "remainingSeconds",
-                "secondsLeft", "expiresIn", "daysRemaining", "daysLeft", "message", "reason"
+                "secondsLeft", "expiresIn", "daysRemaining", "daysLeft", "message", "reason",
+                "expires_at", "expiration_date", "valid_until", "expiration_timestamp",
+                "remaining_seconds", "seconds_left", "expires_in", "days_remaining", "days_left"
             ]
             let hasNestedPayload = dictionary.keys.contains { ["result", "data", "json"].contains($0) }
             let hasStrongLicenseField = strongKeys.contains { key in
