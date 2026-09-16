@@ -193,11 +193,26 @@ final class RemoteControlService: ObservableObject {
     private func reconcile(patches: [RemotePatchPayload]) {
         guard isAuthorized else { return }
         guard let root = try? PatchProjectLibrary.packageRootURL() else { return }
-        let disabled = Set(UserDefaults.standard.stringArray(forKey: disabledKey) ?? [])
+        var disabled = Set(UserDefaults.standard.stringArray(forKey: disabledKey) ?? [])
         let locallyEnabled = Set(UserDefaults.standard.stringArray(forKey: enabledKey) ?? [])
-        let active = Set(patches.filter {
+        let activeCandidates = patches.filter {
             $0.enabled && locallyEnabled.contains($0.filename)
-        }.map(\.filename))
+        }.map(\.filename)
+        let selectedFilename = activeCandidates.sorted().first
+        let active = selectedFilename.map { [$0] } ?? []
+        if activeCandidates.count > 1 {
+            var normalizedEnabled = Set<String>()
+            for filename in activeCandidates {
+                if filename == selectedFilename {
+                    normalizedEnabled.insert(filename)
+                } else {
+                    disabled.insert(filename)
+                    deactivateInstalledPatch(filename, root: try? PatchProjectLibrary.packageRootURL())
+                }
+            }
+            UserDefaults.standard.set(Array(normalizedEnabled), forKey: enabledKey)
+            UserDefaults.standard.set(Array(disabled), forKey: disabledKey)
+        }
         var managed = Set(UserDefaults.standard.stringArray(forKey: managedKey) ?? [])
         for patch in patches where patch.enabled {
             guard isAuthorized else { return }
@@ -246,18 +261,17 @@ final class RemoteControlService: ObservableObject {
         let root = try? PatchProjectLibrary.packageRootURL()
         let url = root?.appendingPathComponent(patch.filename)
         if active {
+            let previouslyEnabled = enabled.filter { $0 != patch.filename }
             disabled.remove(patch.filename)
-            enabled.insert(patch.filename)
+            enabled = [patch.filename]
+            for filename in previouslyEnabled {
+                disabled.insert(filename)
+                deactivateInstalledPatch(filename, root: root)
+            }
         } else {
             disabled.insert(patch.filename)
             enabled.remove(patch.filename)
-            if let item = PatchProjectLibrary.load().first(where: { $0.packageURL.lastPathComponent == patch.filename }) {
-                if let project = item.project, let receipt = DevicePatchService.latestReceipt(projectID: project.id) {
-                    try? DevicePatchService.restore(receipt: receipt)
-                }
-                try? PatchProjectLibrary.delete(item)
-            }
-            if let url { try? FileManager.default.removeItem(at: url) }
+            deactivateInstalledPatch(patch.filename, root: root)
         }
         UserDefaults.standard.set(Array(disabled), forKey: disabledKey)
         UserDefaults.standard.set(Array(enabled), forKey: enabledKey)
@@ -265,6 +279,19 @@ final class RemoteControlService: ObservableObject {
             refreshNow()
         }
         DispatchQueue.main.async { NotificationCenter.default.post(name: Self.patchesDidChange, object: nil) }
+    }
+
+    private func deactivateInstalledPatch(_ filename: String, root: URL?) {
+        if let item = PatchProjectLibrary.load().first(where: { $0.packageURL.lastPathComponent == filename }) {
+            if let project = item.project,
+               let receipt = DevicePatchService.latestReceipt(projectID: project.id) {
+                try? DevicePatchService.restore(receipt: receipt)
+            }
+            try? PatchProjectLibrary.delete(item)
+        }
+        if let root {
+            try? FileManager.default.removeItem(at: root.appendingPathComponent(filename))
+        }
     }
 
     private func downloadAndInstall(_ patch: RemotePatchPayload, existingURL: URL?, destinationURL: URL) throws {
