@@ -1645,9 +1645,19 @@ struct ExternalPanelView: View {
     }
 
     private func startPanelSystem() {
+        guard let patch = panelSystemPatch else {
+            statusMessage = "PAINEL SYSTEM não está disponível no catálogo remoto."
+            return
+        }
         isStarting = true
-        statusMessage = "Abrindo Free Fire..."
-        openFreeFireShortcut(at: 0)
+        statusMessage = "Preparando PAINEL SYSTEM..."
+        withAnimation(.easeInOut(duration: 0.2)) {
+            remoteControl.setPatchActive(patch, active: true)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            statusMessage = "PAINEL SYSTEM ativado — abrindo Free Fire..."
+            openFreeFireShortcut(at: 0)
+        }
     }
 
     private func openFreeFireShortcut(at index: Int) {
