@@ -383,7 +383,11 @@ final class LicenseManager: ObservableObject {
     private func validate(key: String) async throws -> ValidationResult {
         var components = URLComponents(string: endpoint)!
         let publicIP = await Self.publicIPAddress()
-        var json: [String: Any] = ["key": key, "deviceId": deviceID]
+        var json: [String: Any] = [
+            "key": key,
+            "deviceId": deviceID,
+            "platform": "ios"
+        ]
         if let publicIP { json["ip"] = publicIP }
         let payload: [String: Any] = ["json": json]
         let inputData = try JSONSerialization.data(withJSONObject: payload)
@@ -414,10 +418,9 @@ final class LicenseManager: ObservableObject {
             throw LicenseValidationError.invalidResponse
         }
         let status = (fields["status"] as? String)?.lowercased()
-        let valid = Self.booleanValue(
-            fields["valid"] ?? fields["success"] ?? fields["ok"]
-                ?? fields["isValid"] ?? fields["is_valid"]
-        )
+        let active = Self.booleanValue(fields["active"])
+        let valid = Self.booleanValue(fields["valid"] ?? fields["isValid"] ?? fields["is_valid"])
+        let success = Self.booleanValue(fields["success"] ?? fields["ok"])
         let expirationValue = Self.firstValue(in: fields, keys: [
             "expiresAt", "expirationDate", "expires", "expiry", "validUntil",
             "expiration", "expiresAtMs", "expirationTimestamp", "expires_at",
@@ -451,10 +454,19 @@ final class LicenseManager: ObservableObject {
                 || text.contains("chave invalida") || text.contains("chave expirada")
                 || text.contains("chave revogada") || text.contains("chave desativada")
         } ?? false
-        if valid == false && !definitiveInvalidStatus && !invalidMessage {
+        if !definitiveInvalidStatus && !invalidMessage,
+           active == false && valid == false && success == false {
             throw LicenseValidationError.invalidResponse
         }
-        let isValid = (valid ?? activeStatus) && !expiredByDate && !expiredByDuration
+        let serverSaysValid: Bool
+        if definitiveInvalidStatus || invalidMessage {
+            serverSaysValid = false
+        } else if activeStatus || active == true {
+            serverSaysValid = true
+        } else {
+            serverSaysValid = active ?? valid ?? success ?? false
+        }
+        let isValid = serverSaysValid && !expiredByDate && !expiredByDuration
         return ValidationResult(
             isValid: isValid,
             message: responseMessage,
@@ -521,7 +533,7 @@ final class LicenseManager: ObservableObject {
     private static func findLicenseFields(in value: Any) -> [String: Any] {
         if let dictionary = value as? [String: Any] {
             let strongKeys = [
-                "valid", "success", "ok", "isValid", "is_valid", "status",
+                "valid", "active", "success", "ok", "isValid", "is_valid", "status",
                 "expiresAt", "expirationDate", "expires", "expiry", "validUntil",
                 "expiration", "expiresAtMs", "expirationTimestamp", "remainingSeconds",
                 "secondsLeft", "expiresIn", "daysRemaining", "daysLeft", "message", "reason",
