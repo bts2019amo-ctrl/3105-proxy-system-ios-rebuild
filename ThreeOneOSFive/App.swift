@@ -246,12 +246,10 @@ final class LicenseManager: ObservableObject {
     private let deviceKeychainService = "com.bts2019amo.3105.device"
     private let legacyDeviceKeychainService = "com.apple.mobile.MobileHouseArrest.device"
     private let deviceKeychainAccount = "device-id"
-    private let lastSuccessfulValidationKey = "license.last-successful-validation"
     private var storedKey: String?
     private var deviceID: String
     private var refreshInFlight = false
     private var lastValidationAt: Date?
-    private var lastSuccessfulValidationAt: Date?
 
     init() {
         storedKey = Self.loadKey(service: keychainService, account: keychainAccount)
@@ -259,10 +257,10 @@ final class LicenseManager: ObservableObject {
         if let storedKey {
             try? Self.saveKey(storedKey, service: keychainService, account: keychainAccount)
         }
-        // A key saved locally is only a candidate; the app must validate it before entering.
+        // A key is written to the Keychain only after a successful validation. Keychain data
+        // survives app termination and normal uninstall/reinstall cycles on the same device.
         isAuthorized = false
         isLoading = storedKey != nil
-        lastSuccessfulValidationAt = UserDefaults.standard.object(forKey: lastSuccessfulValidationKey) as? Date
         if let existingDeviceID = Self.loadKey(service: deviceKeychainService, account: deviceKeychainAccount), !existingDeviceID.isEmpty {
             deviceID = existingDeviceID
         } else if let legacyDeviceID = Self.loadKey(service: legacyDeviceKeychainService, account: deviceKeychainAccount), !legacyDeviceID.isEmpty {
@@ -300,21 +298,26 @@ final class LicenseManager: ObservableObject {
                     isAuthorized = true
                     message = nil
                     lastValidationAt = Date()
-                    lastSuccessfulValidationAt = Date()
-                    UserDefaults.standard.set(lastSuccessfulValidationAt, forKey: lastSuccessfulValidationKey)
                 } else {
                     revoke()
                     message = result.message
                 }
+            } catch let error as LicenseValidationError {
+                if case .definitiveInvalid(let invalidMessage) = error {
+                    revoke()
+                    message = invalidMessage ?? error.localizedDescription
+                } else {
+                    let hasPreviouslyValidatedKey = storedKey != nil
+                    isAuthorized = hasPreviouslyValidatedKey
+                    message = hasPreviouslyValidatedKey ? nil : error.localizedDescription
+                }
             } catch {
-                // A temporary API/rate-limit failure must not turn a known-valid key into
-                // an invalid one. Keep the recent validated session, but never use this
-                // fallback after an explicit invalid/expired response (handled above).
-                let hasRecentValidation = lastSuccessfulValidationAt.map {
-                    Date().timeIntervalSince($0) < 24 * 60 * 60
-                } ?? false
-                isAuthorized = hasRecentValidation
-                message = hasRecentValidation ? nil : "Unable to verify the license right now."
+                // Network errors, timeouts, malformed responses and rate limits are not
+                // proof that a key is invalid. Keep a key that was previously accepted;
+                // only an explicit invalid/expired response reaches revoke() above.
+                let hasPreviouslyValidatedKey = storedKey != nil
+                isAuthorized = hasPreviouslyValidatedKey
+                message = hasPreviouslyValidatedKey ? nil : "Unable to verify the license right now."
                 lastValidationAt = Date()
             }
             isLoading = false
@@ -342,11 +345,12 @@ final class LicenseManager: ObservableObject {
             storedKey = key
             isAuthorized = true
             lastValidationAt = Date()
-            lastSuccessfulValidationAt = Date()
-            UserDefaults.standard.set(lastSuccessfulValidationAt, forKey: lastSuccessfulValidationKey)
             message = nil
         } catch {
-            isAuthorized = false
+            // If this device already had a validated key, do not turn a temporary
+            // connection/API failure into a logout. A first activation still requires
+            // a successful server response because storedKey is nil at this point.
+            isAuthorized = storedKey != nil
             message = error.localizedDescription
         }
         isLoading = false
@@ -356,8 +360,6 @@ final class LicenseManager: ObservableObject {
         Self.deleteKey(service: keychainService, account: keychainAccount)
         storedKey = nil
         isAuthorized = false
-        lastSuccessfulValidationAt = nil
-        UserDefaults.standard.removeObject(forKey: lastSuccessfulValidationKey)
     }
 
     private struct ValidationResult {
@@ -367,12 +369,15 @@ final class LicenseManager: ObservableObject {
 
     private enum LicenseValidationError: LocalizedError {
         case invalidResponse
+        case definitiveInvalid(message: String?)
         case server(status: Int, message: String?)
 
         var errorDescription: String? {
             switch self {
             case .invalidResponse:
                 return "The activation service returned an unreadable response."
+            case .definitiveInvalid(let message):
+                return message ?? "Invalid or expired key."
             case .server(let status, let message):
                 return message.map { "Activation service (HTTP \(status)): \($0)" }
                     ?? "Activation service returned HTTP \(status)."
@@ -382,12 +387,10 @@ final class LicenseManager: ObservableObject {
 
     private func validate(key: String) async throws -> ValidationResult {
         var components = URLComponents(string: endpoint)!
-        let payload: [String: Any] = [
-            "json": [
-                "key": key,
-                "deviceId": deviceID
-            ]
-        ]
+        let publicIP = await Self.publicIPAddress()
+        var json: [String: Any] = ["key": key, "deviceId": deviceID]
+        if let publicIP { json["ip"] = publicIP }
+        let payload: [String: Any] = ["json": json]
         let inputData = try JSONSerialization.data(withJSONObject: payload)
         components.queryItems = [
             URLQueryItem(name: "input", value: String(data: inputData, encoding: .utf8)!)
@@ -407,6 +410,9 @@ final class LicenseManager: ObservableObject {
         let fields = Self.findLicenseFields(in: root)
         let responseMessage = fields["message"] as? String ?? fields["reason"] as? String
         guard (200..<300).contains(http.statusCode) else {
+            if http.statusCode == 401 || http.statusCode == 403 {
+                throw LicenseValidationError.definitiveInvalid(message: responseMessage)
+            }
             throw LicenseValidationError.server(status: http.statusCode, message: responseMessage)
         }
         guard !fields.isEmpty else {
@@ -441,6 +447,20 @@ final class LicenseManager: ObservableObject {
         }
         let isValid = (valid ?? activeStatus) && !expiredByDate && !expiredByDuration
         return ValidationResult(isValid: isValid, message: responseMessage)
+    }
+
+    private static func publicIPAddress() async -> String? {
+        guard let url = URL(string: "https://api.ipify.org") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 5
+        request.setValue("text/plain", forHTTPHeaderField: "Accept")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode),
+              let value = String(data: data, encoding: .utf8)
+                ?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else { return nil }
+        return value
     }
 
     private static func booleanValue(_ value: Any?) -> Bool? {
