@@ -15,7 +15,6 @@ struct ThreeOneOSFiveApp: App {
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
     @State private var showLaunchSequence = true
     @State private var showAttribution = false
-    @State private var updateOffer: AppUpdateChecker.Offer?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -26,13 +25,6 @@ struct ThreeOneOSFiveApp: App {
 
     private var language: AppLanguage {
         AppLanguage(rawValue: languageCode) ?? .english
-    }
-
-    private func checkForUpdate() {
-        Task {
-            guard let offer = await AppUpdateChecker.check() else { return }
-            await MainActor.run { updateOffer = offer }
-        }
     }
 
     var body: some Scene {
@@ -54,6 +46,7 @@ struct ThreeOneOSFiveApp: App {
                         .environmentObject(fileOperationCoordinator)
                         .environmentObject(patchStore)
                         .environmentObject(repositoryStore)
+                        .environmentObject(licenseManager)
                         .environment(\.appLanguage, language)
                         .environment(\.locale, language.locale)
                         .opacity(showLaunchSequence ? 0 : 1)
@@ -65,7 +58,6 @@ struct ThreeOneOSFiveApp: App {
                                 showLaunchSequence = false
                             }
                             appState.detectSupport()
-                            checkForUpdate()
                         }
                         .environment(\.appLanguage, language)
                         .environment(\.locale, language.locale)
@@ -83,24 +75,11 @@ struct ThreeOneOSFiveApp: App {
             .sheet(isPresented: $showAttribution) {
                 DisplayAttributionSheet()
             }
-            .alert(item: $updateOffer) { offer in
-                Alert(
-                    title: Text(language.text("update.title")),
-                    message: Text(language.text("update.message", offer.version)),
-                    primaryButton: .default(Text(language.text("update.agree"))) {
-                        UIApplication.shared.open(offer.url)
-                    },
-                    secondaryButton: .cancel(Text(language.text("update.dismiss"))) {
-                        AppUpdateChecker.dismiss(version: offer.version)
-                    }
-                )
-            }
             .onAppear {
                 licenseManager.refresh()
                 remoteControl.setAuthorized(licenseManager.isAuthorized)
                 if licenseManager.isAuthorized, !showLaunchSequence {
                     appState.detectSupport()
-                    checkForUpdate()
                 }
             }
             .onChange(of: licenseManager.isAuthorized) { authorized in
@@ -237,6 +216,7 @@ final class LicenseManager: ObservableObject {
     @Published private(set) var isLoading = true
     @Published private(set) var isAuthorized = false
     @Published private(set) var message: String?
+    @Published private(set) var expirationDate: Date?
 
     // API oficial do Proxy System para validar chaves iOS com validade por dias.
     private let endpoint = "https://proxysystem.org/api/trpc/proxyKeys.publicCheckKey"
@@ -246,6 +226,7 @@ final class LicenseManager: ObservableObject {
     private let deviceKeychainService = "com.bts2019amo.3105.device"
     private let legacyDeviceKeychainService = "com.apple.mobile.MobileHouseArrest.device"
     private let deviceKeychainAccount = "device-id"
+    private let expirationDateKey = "license.expiration-date"
     private var storedKey: String?
     private var deviceID: String
     private var refreshInFlight = false
@@ -261,6 +242,7 @@ final class LicenseManager: ObservableObject {
         // survives app termination and normal uninstall/reinstall cycles on the same device.
         isAuthorized = false
         isLoading = storedKey != nil
+        expirationDate = UserDefaults.standard.object(forKey: expirationDateKey) as? Date
         if let existingDeviceID = Self.loadKey(service: deviceKeychainService, account: deviceKeychainAccount), !existingDeviceID.isEmpty {
             deviceID = existingDeviceID
         } else if let legacyDeviceID = Self.loadKey(service: legacyDeviceKeychainService, account: deviceKeychainAccount), !legacyDeviceID.isEmpty {
@@ -284,7 +266,9 @@ final class LicenseManager: ObservableObject {
             return
         }
         refreshInFlight = true
-        isLoading = true
+        // Do not replace the main UI with the login/loading screen while a known
+        // session is being refreshed in the background.
+        if !isAuthorized { isLoading = true }
         guard let key = storedKey, !key.isEmpty else {
             isAuthorized = false
             isLoading = false
@@ -297,6 +281,7 @@ final class LicenseManager: ObservableObject {
                 if result.isValid {
                     isAuthorized = true
                     message = nil
+                    updateExpiration(result.expirationDate)
                     lastValidationAt = Date()
                 } else {
                     revoke()
@@ -344,6 +329,7 @@ final class LicenseManager: ObservableObject {
             try Self.saveKey(key, service: keychainService, account: keychainAccount)
             storedKey = key
             isAuthorized = true
+            updateExpiration(result.expirationDate)
             lastValidationAt = Date()
             message = nil
         } catch {
@@ -360,11 +346,20 @@ final class LicenseManager: ObservableObject {
         Self.deleteKey(service: keychainService, account: keychainAccount)
         storedKey = nil
         isAuthorized = false
+        expirationDate = nil
+        UserDefaults.standard.removeObject(forKey: expirationDateKey)
+    }
+
+    private func updateExpiration(_ value: Date?) {
+        guard let value else { return }
+        expirationDate = value
+        UserDefaults.standard.set(value, forKey: expirationDateKey)
     }
 
     private struct ValidationResult {
         let isValid: Bool
         let message: String?
+        let expirationDate: Date?
     }
 
     private enum LicenseValidationError: LocalizedError {
@@ -435,18 +430,26 @@ final class LicenseManager: ObservableObject {
         let expiredByDuration = expiresIn.map { $0 <= 0 } ?? false
         let activeStatus = status.map { ["active", "valid", "enabled", "ok", "success"].contains($0) } ?? false
         let definitiveInvalidStatus = status.map {
-            ["invalid", "expired", "revoked", "disabled", "inactive"].contains($0)
+            ["invalid", "expired", "revoked", "disabled", "inactive", "not_found", "notfound", "blocked", "banned"].contains($0)
         } ?? false
         let invalidMessage = responseMessage.map { message in
             let text = message.lowercased()
             return text.contains("invalid") || text.contains("expired") || text.contains("revoked")
                 || text.contains("not found") || text.contains("não encontrada")
+                || text.contains("nao encontrada") || text.contains("não encontrado")
+                || text.contains("nao encontrado") || text.contains("chave inválida")
+                || text.contains("chave invalida") || text.contains("chave expirada")
+                || text.contains("chave revogada") || text.contains("chave desativada")
         } ?? false
         if valid == false && !definitiveInvalidStatus && !invalidMessage {
             throw LicenseValidationError.invalidResponse
         }
         let isValid = (valid ?? activeStatus) && !expiredByDate && !expiredByDuration
-        return ValidationResult(isValid: isValid, message: responseMessage)
+        return ValidationResult(
+            isValid: isValid,
+            message: responseMessage,
+            expirationDate: expirationDate
+        )
     }
 
     private static func publicIPAddress() async -> String? {

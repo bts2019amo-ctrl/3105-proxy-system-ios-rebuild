@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var licenseManager: LicenseManager
     @AppStorage("externalTheme") private var theme = "purple"
     @AppStorage("customAccentHex") private var customAccentHex = "A34FFA"
     @State private var customColor: Color
@@ -31,6 +32,7 @@ struct SettingsView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 22) {
                     appearanceSection
+                    licenseSection
                     deviceSection
                     aboutSection
                 }
@@ -121,6 +123,35 @@ struct SettingsView: View {
         .animation(.spring(response: 0.34, dampingFraction: 0.76), value: theme)
     }
 
+    private var licenseSection: some View {
+        settingsSection(title: "LICENÇA", icon: "checkmark.seal.fill") {
+            VStack(spacing: 0) {
+                infoRow(
+                    icon: "checkmark.circle.fill",
+                    title: "Acesso ativo",
+                    value: licenseManager.isAuthorized ? "Sim" : "Não",
+                    valueColor: licenseManager.isAuthorized ? .green : .red
+                )
+                Divider().opacity(0.25)
+                infoRow(
+                    icon: "iphone.badge.checkmark",
+                    title: "Licença verificada neste dispositivo",
+                    value: licenseManager.isAuthorized ? "Verificada" : "Não verificada",
+                    valueColor: licenseManager.isAuthorized ? .green : .red
+                )
+                if let expirationDate = licenseManager.expirationDate {
+                    Divider().opacity(0.25)
+                    infoRow(
+                        icon: "calendar.badge.clock",
+                        title: "Expira em",
+                        value: fullDateFormatter.string(from: expirationDate),
+                        valueColor: .primary
+                    )
+                }
+            }
+        }
+    }
+
     private var deviceSection: some View {
         settingsSection(title: "DISPOSITIVO", icon: "iphone") {
             VStack(spacing: 0) {
@@ -168,9 +199,22 @@ struct SettingsView: View {
             AppRowIcon(systemName: icon, tint: themeAccent)
             Text(title).font(.subheadline.weight(.semibold))
             Spacer()
-            Text(value).font(.caption).foregroundStyle(valueColor).lineLimit(1)
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(valueColor)
+                .multilineTextAlignment(.trailing)
+                .lineLimit(3)
+                .frame(maxWidth: 190, alignment: .trailing)
         }
         .padding(.vertical, 8)
+    }
+
+    private var fullDateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.dateStyle = .full
+        formatter.timeStyle = .medium
+        return formatter
     }
 
     private var appVersion: String {
