@@ -53,7 +53,7 @@ struct ThreeOneOSFiveApp: App {
                         .allowsHitTesting(!showLaunchSequence)
 
                     if showLaunchSequence {
-                        LaunchSequenceView {
+                        LaunchSequenceView(expirationDate: licenseManager.expirationDate) {
                             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.24)) {
                                 showLaunchSequence = false
                             }

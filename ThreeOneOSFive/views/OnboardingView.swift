@@ -681,6 +681,7 @@ private enum LaunchSequencePhase {
 struct LaunchSequenceView: View {
     @State private var phase: LaunchSequencePhase = .loading
     @State private var progress = 72
+    let expirationDate: Date?
     let onContinue: () -> Void
 
     var body: some View {
@@ -789,6 +790,10 @@ struct LaunchSequenceView: View {
                         .foregroundStyle(.secondary)
                     Text("Licença verificada neste dispositivo")
                         .font(.subheadline.weight(.semibold))
+                    Text(expirationText)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(AppTheme.accent)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
             }
@@ -809,6 +814,17 @@ struct LaunchSequenceView: View {
             .frame(maxWidth: 420)
         }
         .padding(24)
+    }
+
+    private var expirationText: String {
+        guard let expirationDate else {
+            return "Expiração: não informada pela API"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.dateStyle = .full
+        formatter.timeStyle = .medium
+        return "Expira em: \(formatter.string(from: expirationDate))"
     }
 
     private func runLoadingSequence() async {
