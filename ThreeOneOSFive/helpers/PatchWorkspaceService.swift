@@ -23,7 +23,6 @@ enum PatchWorkspaceService {
         let documents = try documentsRootURL(fileManager: fileManager)
         let root = documents.appendingPathComponent("Patches", isDirectory: true)
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try protect(url: root, fileManager: fileManager)
         return root
     }
 
@@ -98,7 +97,6 @@ enum PatchWorkspaceService {
                 workspaceURL: staging
             )
             try fileManager.moveItem(at: staging, to: destination)
-            try protect(url: destination, fileManager: fileManager)
             return destination
         } catch let error as PatchPackageError {
             throw error
@@ -329,22 +327,6 @@ enum PatchWorkspaceService {
             return
         }
         try fileManager.removeItem(at: workspace)
-    }
-
-    private static func protect(url: URL, fileManager: FileManager) throws {
-        try fileManager.setAttributes(
-            [.protectionKey: FileProtectionType.completeUnlessOpen],
-            ofItemAtPath: url.path
-        )
-        guard let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: nil) else {
-            return
-        }
-        for case let child as URL in enumerator {
-            try fileManager.setAttributes(
-                [.protectionKey: FileProtectionType.completeUnlessOpen],
-                ofItemAtPath: child.path
-            )
-        }
     }
 
     private static func workspaceTarget(
