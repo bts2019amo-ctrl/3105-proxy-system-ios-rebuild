@@ -457,9 +457,9 @@ final class LicenseManager: ObservableObject {
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode),
-              let value = String(data: data, encoding: .utf8)
-                ?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !value.isEmpty else { return nil }
+              let text = String(data: data, encoding: .utf8) else { return nil }
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
         return value
     }
 
