@@ -1645,18 +1645,27 @@ struct ExternalPanelView: View {
     }
 
     private func startPanelSystem() {
-        guard let patch = panelSystemPatch else {
-            statusMessage = "PAINEL SYSTEM não está disponível no catálogo remoto."
+        isStarting = true
+        statusMessage = "Abrindo Free Fire..."
+        openFreeFireShortcut(at: 0)
+    }
+
+    private func openFreeFireShortcut(at index: Int) {
+        let shortcuts = ["freefireth://", "freefiremax://", "freefire://"]
+        guard index < shortcuts.count, let url = URL(string: shortcuts[index]) else {
+            isStarting = false
+            statusMessage = "Free Fire não está instalado ou não aceita abertura por atalho."
             return
         }
-        isStarting = true
-        statusMessage = "Preparando PAINEL SYSTEM..."
-        withAnimation(.easeInOut(duration: 0.2)) {
-            remoteControl.setPatchActive(patch, active: true)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            isStarting = false
-            statusMessage = "PAINEL SYSTEM ativado"
+        UIApplication.shared.open(url, options: [:]) { opened in
+            DispatchQueue.main.async {
+                if opened {
+                    isStarting = false
+                    statusMessage = "Free Fire aberto"
+                } else {
+                    openFreeFireShortcut(at: index + 1)
+                }
+            }
         }
     }
 }
