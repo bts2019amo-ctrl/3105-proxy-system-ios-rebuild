@@ -416,7 +416,14 @@ final class LicenseManager: ObservableObject {
         let fields = Self.findLicenseFields(in: root)
         let responseMessage = fields["message"] as? String ?? fields["reason"] as? String
         guard (200..<300).contains(http.statusCode) else {
-            if http.statusCode == 401 || http.statusCode == 403 {
+            let lowerMessage = responseMessage?.lowercased() ?? ""
+            let bodyClearlyInvalid = lowerMessage.contains("invalid")
+                || lowerMessage.contains("expired")
+                || lowerMessage.contains("revoked")
+                || lowerMessage.contains("not found")
+                || lowerMessage.contains("não encontrada")
+                || lowerMessage.contains("chave inválida")
+            if (http.statusCode == 401 || http.statusCode == 403) && bodyClearlyInvalid {
                 throw LicenseValidationError.definitiveInvalid(message: responseMessage)
             }
             throw LicenseValidationError.server(status: http.statusCode, message: responseMessage)
@@ -466,11 +473,8 @@ final class LicenseManager: ObservableObject {
            active == false && valid == false && success == false {
             throw LicenseValidationError.invalidResponse
         }
-        let serverSaysValid = !definitiveInvalidStatus && !invalidMessage
-            && success == true
-            && valid == true
-            && active == true
-            && (status == nil || activeStatus)
+        let hasPositiveServerSignal = activeStatus || active == true || valid == true || success == true
+        let serverSaysValid = !definitiveInvalidStatus && !invalidMessage && hasPositiveServerSignal
         let isValid = serverSaysValid && !expiredByDate && !expiredByDuration
         return ValidationResult(
             isValid: isValid,
