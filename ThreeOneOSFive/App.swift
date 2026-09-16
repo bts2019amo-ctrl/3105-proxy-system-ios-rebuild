@@ -381,14 +381,21 @@ final class LicenseManager: ObservableObject {
     }
 
     private func validate(key: String) async throws -> ValidationResult {
+        if key.hasPrefix("PROXYSYSTEM-ANDROID-") {
+            throw LicenseValidationError.definitiveInvalid(
+                message: "Esta é uma chave Android. Use uma chave iOS do Proxy System."
+            )
+        }
+        guard key.hasPrefix("PROXY-SYSTEM-") else {
+            throw LicenseValidationError.definitiveInvalid(
+                message: "Chave inválida para iOS. Use uma chave iOS do Proxy System."
+            )
+        }
         var components = URLComponents(string: endpoint)!
-        let publicIP = await Self.publicIPAddress()
         var json: [String: Any] = [
             "key": key,
-            "deviceId": deviceID,
-            "platform": "ios"
+            "deviceId": deviceID
         ]
-        if let publicIP { json["ip"] = publicIP }
         let payload: [String: Any] = ["json": json]
         let inputData = try JSONSerialization.data(withJSONObject: payload)
         components.queryItems = [
