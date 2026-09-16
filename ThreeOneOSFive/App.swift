@@ -418,20 +418,19 @@ final class LicenseManager: ObservableObject {
             fields["valid"] ?? fields["success"] ?? fields["ok"]
                 ?? fields["isValid"] ?? fields["is_valid"]
         )
-        let expirationValue = fields["expiresAt"] ?? fields["expirationDate"]
-            ?? fields["expires"] ?? fields["expiry"] ?? fields["validUntil"]
-            ?? fields["expiration"] ?? fields["expiresAtMs"] ?? fields["expirationTimestamp"]
-            ?? fields["expires_at"] ?? fields["expiration_date"] ?? fields["valid_until"]
-            ?? fields["expiration_timestamp"]
+        let expirationValue = Self.firstValue(in: fields, keys: [
+            "expiresAt", "expirationDate", "expires", "expiry", "validUntil",
+            "expiration", "expiresAtMs", "expirationTimestamp", "expires_at",
+            "expiration_date", "valid_until", "expiration_timestamp"
+        ])
         var expirationDate = Self.expirationDate(from: expirationValue)
-        let remainingSeconds = Self.numberValue(
-            fields["remainingSeconds"] ?? fields["secondsLeft"] ?? fields["expiresIn"]
-                ?? fields["remaining_seconds"] ?? fields["seconds_left"] ?? fields["expires_in"]
-        )
-        let remainingDays = Self.numberValue(
-            fields["daysRemaining"] ?? fields["daysLeft"]
-                ?? fields["days_remaining"] ?? fields["days_left"]
-        )
+        let remainingSeconds = Self.numberValue(from: fields, keys: [
+            "remainingSeconds", "secondsLeft", "expiresIn", "remaining_seconds",
+            "seconds_left", "expires_in"
+        ])
+        let remainingDays = Self.numberValue(from: fields, keys: [
+            "daysRemaining", "daysLeft", "days_remaining", "days_left"
+        ])
         if expirationDate == nil, let remainingSeconds, remainingSeconds > 0 {
             expirationDate = Date(timeIntervalSinceNow: remainingSeconds)
         } else if expirationDate == nil, let remainingDays, remainingDays > 0 {
@@ -494,6 +493,17 @@ final class LicenseManager: ObservableObject {
         if let value = value as? NSNumber { return value.doubleValue }
         if let value = value as? String { return Double(value) }
         return nil
+    }
+
+    private static func firstValue(in fields: [String: Any], keys: [String]) -> Any? {
+        for key in keys {
+            if let value = fields[key] { return value }
+        }
+        return nil
+    }
+
+    private static func numberValue(from fields: [String: Any], keys: [String]) -> Double? {
+        numberValue(firstValue(in: fields, keys: keys))
     }
 
     private static func expirationDate(from value: Any?) -> Date? {
