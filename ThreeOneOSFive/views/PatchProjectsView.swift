@@ -18,6 +18,7 @@ struct PatchProjectsView: View {
     @EnvironmentObject private var draftCoordinator: PatchDraftCoordinator
     @EnvironmentObject private var store: PatchProjectStore
     @EnvironmentObject private var remoteControl: RemoteControlService
+    @EnvironmentObject private var repositoryStore: PackageRepositoryStore
     @State private var showCreate = false
     @State private var wallpaperPackages: [WallpaperStagedPackage] = []
     @State private var wallpaperImportFeedback: WallpaperImportFeedback?
@@ -47,9 +48,19 @@ struct PatchProjectsView: View {
         }
     }
 
+    private var repositoryPatchesForSelection: [RepositoryPackageRecord] {
+        repositoryStore.packages.filter { record in
+            guard record.package.kind == .patch else { return false }
+            let value = ([record.package.name, record.package.category ?? ""] + record.package.tags)
+                .joined(separator: " ").uppercased()
+            return selectedCollection == "FF MAX" ? value.contains("MAX") : !value.contains("MAX")
+        }
+    }
+
     private var hasLocalContent: Bool {
         !store.items.isEmpty
             || !wallpaperPackages.isEmpty
+            || !repositoryPatchesForSelection.isEmpty
             || !remotePatchesForSelection.isEmpty
     }
 
@@ -129,6 +140,7 @@ struct PatchProjectsView: View {
             .onAppear {
                 reloadWallpaperPackages()
                 consumeExternalImport()
+                repositoryStore.refreshAllIfNeeded()
 #if targetEnvironment(simulator)
                 if ProcessInfo.processInfo.arguments.contains(
                     "--simulate-wallpaper-detail"
@@ -238,7 +250,11 @@ struct PatchProjectsView: View {
     private var installedContentCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(selectedCollection).font(.caption2.weight(.bold)).tracking(1.2).foregroundStyle(.secondary).padding(.horizontal, 4).padding(.bottom, 5)
-            if !remotePatchesForSelection.isEmpty {
+            if !repositoryPatchesForSelection.isEmpty {
+                ForEach(repositoryPatchesForSelection, id: \.id) { record in
+                    repositoryPatchRow(record).padding(.vertical, 5)
+                }
+            } else if !remotePatchesForSelection.isEmpty {
                 ForEach(remotePatchesForSelection, id: \.id) { patch in
                     remotePatchRow(patch).padding(.vertical, 5)
                 }
@@ -253,6 +269,34 @@ struct PatchProjectsView: View {
         .overlay { RoundedRectangle(cornerRadius: 21, style: .continuous).stroke(Color.white.opacity(0.22), lineWidth: 0.8) }
         .shadow(color: AppTheme.glassShadow, radius: 16, y: 8)
         .animation(.spring(response: 0.42, dampingFraction: 0.84), value: selectedCollection)
+    }
+
+    private func repositoryPatchRow(_ record: RepositoryPackageRecord) -> some View {
+        HStack(spacing: 12) {
+            AppRowIcon(systemName: "shippingbox.fill")
+            VStack(alignment: .leading, spacing: 3) {
+                Text(record.package.name).font(.body.weight(.semibold)).lineLimit(1)
+                Text("\(record.package.version) · \(record.sourceName)")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Button {
+                repositoryStore.install(record, using: store)
+            } label: {
+                if repositoryStore.isDownloading(record) {
+                    ProgressView().tint(.white)
+                } else {
+                    Image(systemName: "arrow.down.circle.fill")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppTheme.accent)
+            .disabled(repositoryStore.isDownloading(record))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(AppTheme.glassBase.opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.22), lineWidth: 0.7) }
     }
 
     private var emptyInstalledCard: some View {
