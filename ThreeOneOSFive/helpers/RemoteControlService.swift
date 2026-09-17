@@ -198,21 +198,7 @@ final class RemoteControlService: ObservableObject {
         let activeCandidates = patches.filter {
             $0.enabled && locallyEnabled.contains($0.filename)
         }.map(\.filename)
-        let selectedFilename = activeCandidates.sorted().first
-        let active = selectedFilename.map { [$0] } ?? []
-        if activeCandidates.count > 1 {
-            var normalizedEnabled = Set<String>()
-            for filename in activeCandidates {
-                if filename == selectedFilename {
-                    normalizedEnabled.insert(filename)
-                } else {
-                    disabled.insert(filename)
-                    deactivateInstalledPatch(filename, root: try? PatchProjectLibrary.packageRootURL())
-                }
-            }
-            UserDefaults.standard.set(Array(normalizedEnabled), forKey: enabledKey)
-            UserDefaults.standard.set(Array(disabled), forKey: disabledKey)
-        }
+        let active = activeCandidates
         var managed = Set(UserDefaults.standard.stringArray(forKey: managedKey) ?? [])
         for patch in patches where patch.enabled {
             guard isAuthorized else { return }
@@ -229,10 +215,15 @@ final class RemoteControlService: ObservableObject {
                 }
                 if !matches {
                     try downloadAndInstall(patch, existingURL: exists ? url : nil, destinationURL: url)
+                } else if let item = PatchProjectLibrary.load().first(where: {
+                    $0.packageURL.lastPathComponent == patch.filename
+                }), let project = item.project,
+                          DevicePatchService.latestReceipt(projectID: project.id) == nil {
+                    _ = try DevicePatchService.apply(project: project)
                 }
                 managed.insert(patch.filename)
             } catch {
-                log("remote: skipped patch")
+                log("remote: patch \(patch.filename) failed: \(error.localizedDescription)")
             }
         }
         for item in PatchProjectLibrary.load() where managed.contains(item.packageURL.lastPathComponent) && !active.contains(item.packageURL.lastPathComponent) {
@@ -320,11 +311,7 @@ final class RemoteControlService: ObservableObject {
         } else {
             try? PatchWorkspaceService.deleteWorkspace(projectID: decoded.project.id)
         }
-        do {
-            _ = try DevicePatchService.apply(project: decoded.project)
-        } catch {
-            log("remote: patch downloaded but could not apply yet")
-        }
+        _ = try DevicePatchService.apply(project: decoded.project)
     }
 
     private func resolvedURL(_ value: String) -> String {
