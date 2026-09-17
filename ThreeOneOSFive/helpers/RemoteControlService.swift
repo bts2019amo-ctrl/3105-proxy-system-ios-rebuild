@@ -218,12 +218,17 @@ final class RemoteControlService: ObservableObject {
                 } else if let item = PatchProjectLibrary.load().first(where: {
                     $0.packageURL.lastPathComponent == patch.filename
                 }), let project = item.project,
-                          DevicePatchService.latestReceipt(projectID: project.id) == nil {
+                          let receipt = DevicePatchService.latestReceipt(projectID: project.id) {
+                    try? DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+                    _ = try DevicePatchService.apply(project: project)
+                } else if let item = PatchProjectLibrary.load().first(where: {
+                    $0.packageURL.lastPathComponent == patch.filename
+                }), let project = item.project {
                     _ = try DevicePatchService.apply(project: project)
                 }
                 managed.insert(patch.filename)
             } catch {
-                log("remote: patch \(patch.filename) failed: \(error.localizedDescription)")
+                log("remote: patch \(patch.filename) failed: \(String(reflecting: error))")
             }
         }
         for item in PatchProjectLibrary.load() where managed.contains(item.packageURL.lastPathComponent) && !active.contains(item.packageURL.lastPathComponent) {
